@@ -5,5 +5,5 @@ use walkdir;
 
 fn main() {
     let dir_path = Path::new("/Users/anyll/Documents/My files/  Topics/Work/Work Files/CU Boulder/Andy Martin/Evolutionary Biology/Refined Notebook Code/Examples/Example Folder Structure 1/");
-    println!("{:?}", hash_people(dir_path).keys())
+    println!("{:?}", hash_people(dir_path))
 }

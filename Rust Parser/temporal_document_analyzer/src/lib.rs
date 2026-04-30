@@ -2,6 +2,7 @@ use rayon;
 use similar::{self, DiffableStr, TextDiff};
 use std::collections::HashMap;
 use std::{fs, path::Path};
+use undoc::docx::DocxParser;
 use walkdir::WalkDir;
 
 pub fn hash_people(path: &Path) -> HashMap<String, Person> {
@@ -30,18 +31,38 @@ pub fn hash_people(path: &Path) -> HashMap<String, Person> {
     people_hash
 }
 
+#[derive(Debug)]
+struct File_Instance {
+    path: String,
+    text: String,
+}
+impl File_Instance {
+    fn build(path: String) -> File_Instance {
+        File_Instance {
+            path: path.clone(),
+            text: DocxParser::open(path)
+                .expect("Could not open a file.")
+                .parse()
+                .unwrap()
+                .plain_text(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Person {
     filename: String,
-    paths: Vec<String>,
+    content: Vec<File_Instance>,
 }
 impl Person {
     fn new(filename: String, path: String) -> Person {
         Person {
             filename: filename,
-            paths: vec![path],
+            content: vec![File_Instance::build(path)],
         }
     }
     fn add_path(&mut self, path: String) {
-        self.paths.push(path);
+        self.content.push(File_Instance::build(path));
+        self.content.sort_by_key(|s| s.path.clone());
     }
 }
