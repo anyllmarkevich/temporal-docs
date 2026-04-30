@@ -1,5 +1,5 @@
-use rayon;
-use similar::{self, DiffableStr, TextDiff};
+use rayon::{self, join};
+use similar::{self, ChangeTag, DiffableStr, TextDiff};
 use std::collections::HashMap;
 use std::{fs, path::Path};
 use undoc::docx::DocxParser;
@@ -31,7 +31,7 @@ pub fn hash_people(path: &Path) -> HashMap<String, Person> {
     people_hash
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct File_Instance {
     path: String,
     text: String,
@@ -64,5 +64,21 @@ impl Person {
     fn add_path(&mut self, path: String) {
         self.content.push(File_Instance::build(path));
         self.content.sort_by_key(|s| s.path.clone());
+    }
+    pub fn find_diffs(&self) -> Vec<String> {
+        self.content
+            .iter()
+            .map(|instance| instance.text.clone())
+            .collect::<Vec<String>>()
+            .windows(2)
+            .map(|window| {
+                TextDiff::from_lines(window[0].clone(), window[1].clone())
+                    .iter_all_changes()
+                    .filter(|change| change.tag() == ChangeTag::Insert)
+                    .map(|change| change.value().to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            })
+            .collect()
     }
 }
