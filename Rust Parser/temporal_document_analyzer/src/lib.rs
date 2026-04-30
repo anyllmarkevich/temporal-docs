@@ -3,6 +3,7 @@ use similar::{self, ChangeTag, DiffableStr, TextDiff};
 use std::collections::HashMap;
 use std::{fs, path::Path};
 use undoc::docx::DocxParser;
+use unicode_segmentation::UnicodeSegmentation;
 use walkdir::WalkDir;
 
 pub fn hash_people(path: &Path) -> HashMap<String, Person> {
@@ -68,7 +69,15 @@ impl Person {
     pub fn find_diffs(&self) -> Vec<String> {
         self.content
             .iter()
-            .map(|instance| instance.text.clone())
+            .map(|instance| {
+                instance
+                    .text
+                    .clone()
+                    .unicode_sentences()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            })
             .collect::<Vec<String>>()
             .windows(2)
             .map(|window| {
@@ -77,7 +86,7 @@ impl Person {
                     .filter(|change| change.tag() == ChangeTag::Insert)
                     .map(|change| change.value().to_string())
                     .collect::<Vec<String>>()
-                    .join("\n")
+                    .join("")
             })
             .collect()
     }
