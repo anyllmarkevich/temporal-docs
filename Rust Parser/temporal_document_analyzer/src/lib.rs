@@ -1,5 +1,5 @@
 use rayon::{self, join};
-use similar::{self, ChangeTag, DiffableStr, TextDiff};
+use similar::{self, ChangeTag, DiffableStr, DiffableStrRef, TextDiff};
 use std::collections::HashMap;
 use std::{fs, path::Path};
 use undoc::docx::DocxParser;
@@ -69,24 +69,19 @@ impl Person {
     pub fn find_diffs(&self) -> Vec<String> {
         self.content
             .iter()
-            .map(|instance| {
-                instance
-                    .text
-                    .clone()
-                    .unicode_sentences()
-                    .map(|s| s.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\n")
-            })
+            .map(|instance| instance.text.clone())
             .collect::<Vec<String>>()
             .windows(2)
             .map(|window| {
-                TextDiff::from_lines(window[0].clone(), window[1].clone())
-                    .iter_all_changes()
-                    .filter(|change| change.tag() == ChangeTag::Insert)
-                    .map(|change| change.value().to_string())
-                    .collect::<Vec<String>>()
-                    .join("")
+                TextDiff::from_slices(
+                    window[0].unicode_sentences().map(|x| x.as_str()),
+                    window[1].unicode_sentences().map(|x| x.as_str()),
+                )
+                .iter_all_changes()
+                .filter(|change| change.tag() == ChangeTag::Insert)
+                .map(|change: similar::Change<_>| change.value().to_string())
+                .collect::<Vec<String>>()
+                .join("")
             })
             .collect()
     }
