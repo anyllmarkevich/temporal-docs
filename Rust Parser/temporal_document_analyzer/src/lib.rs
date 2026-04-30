@@ -67,7 +67,8 @@ impl Person {
         self.content.sort_by_key(|s| s.path.clone());
     }
     pub fn find_diffs(&self) -> Vec<String> {
-        self.content
+        let mut diffs_vec: Vec<String> = self
+            .content
             .iter()
             .map(|instance| {
                 instance
@@ -88,6 +89,8 @@ impl Person {
                     .collect::<Vec<String>>()
                     .join("")
             })
-            .collect()
+            .collect();
+        diffs_vec.insert(0, self.content[0].clone().text);
+        diffs_vec
     }
 }
