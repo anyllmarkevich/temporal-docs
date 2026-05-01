@@ -3,7 +3,7 @@ use similar::{self, ChangeTag, DiffableStr, DiffableStrRef, TextDiff};
 use std::collections::HashMap;
 use std::{fs, path::Path};
 use undoc::docx::DocxParser;
-use unicode_segmentation::UnicodeSegmentation;
+use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
 use walkdir::WalkDir;
 
 pub fn hash_people(path: &Path) -> HashMap<String, Person> {
@@ -74,8 +74,14 @@ impl Person {
             .windows(2)
             .map(|window| {
                 TextDiff::from_slices(
-                    window[0].unicode_sentences().map(|x| x.as_str()),
-                    window[1].unicode_sentences().map(|x| x.as_str()),
+                    &window[0]
+                        .unicode_sentences()
+                        .map(|x| x.as_str().unwrap())
+                        .collect::<Vec<&str>>(),
+                    &window[1]
+                        .unicode_sentences()
+                        .map(|x| x.as_str().unwrap())
+                        .collect::<Vec<&str>>(),
                 )
                 .iter_all_changes()
                 .filter(|change| change.tag() == ChangeTag::Insert)
