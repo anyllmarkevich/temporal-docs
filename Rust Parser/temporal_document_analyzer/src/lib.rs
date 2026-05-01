@@ -132,8 +132,8 @@ impl NewPerson {
             .zip(
                 self.content
                     .iter()
+                    .skip(1)
                     .map(|x| x.time.clone())
-                    .next()
                     .into_iter()
                     .collect::<Vec<String>>(),
             )
