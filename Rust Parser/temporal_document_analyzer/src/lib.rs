@@ -111,7 +111,7 @@ impl File_Instance {
                 .to_string(),
             filesize: fs::metadata(&path).unwrap().len(),
             text: DocxParser::open(path)
-                .expect("Could not open a file.")
+                .expect("Couldn't open a file.")
                 .parse()
                 .unwrap()
                 .plain_text(),
