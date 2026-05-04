@@ -92,15 +92,15 @@ impl SummaryStats {
 }
 
 #[derive(Debug, Clone)]
-pub struct File_Instance {
+pub struct FileInstance {
     path: String,
     time: String,
     filesize: u64,
     text: String,
 }
-impl File_Instance {
-    fn build(path: String) -> File_Instance {
-        File_Instance {
+impl FileInstance {
+    fn build(path: String) -> FileInstance {
+        FileInstance {
             path: path.clone(),
             time: Path::new(&path)
                 .components()
@@ -148,18 +148,18 @@ impl EditInstance {
 #[derive(Debug)]
 struct NewPerson {
     filename: String,
-    content: Vec<File_Instance>,
+    content: Vec<FileInstance>,
 }
 
 impl NewPerson {
     fn build(filename: String, path: String) -> NewPerson {
         NewPerson {
             filename: filename,
-            content: vec![File_Instance::build(path)],
+            content: vec![FileInstance::build(path)],
         }
     }
     fn add_path(&mut self, path: String) {
-        self.content.push(File_Instance::build(path));
+        self.content.push(FileInstance::build(path));
         self.content.sort_by_key(|s| s.path.clone());
     }
     pub fn construct_history(self) -> PersonHistory {
@@ -215,7 +215,7 @@ impl NewPerson {
 pub struct PersonHistory {
     diffmap: Vec<EditInstance>,
     filename: String,
-    content: Vec<File_Instance>,
+    content: Vec<FileInstance>,
 }
 impl PersonHistory {
     pub fn print_history(&self) {
