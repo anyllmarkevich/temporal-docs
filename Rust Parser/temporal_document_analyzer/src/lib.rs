@@ -116,18 +116,18 @@ impl NewPerson {
                 TextDiff::from_slices(
                     &window[0]
                         .unicode_sentences()
-                        .map(|x| x.as_str().unwrap())
+                        .map(|x| x.as_str().unwrap().trim())
                         .collect::<Vec<&str>>(),
                     &window[1]
                         .unicode_sentences()
-                        .map(|x| x.as_str().unwrap())
+                        .map(|x| x.as_str().unwrap().trim())
                         .collect::<Vec<&str>>(),
                 )
                 .iter_all_changes()
                 .filter(|change| change.tag() == ChangeTag::Insert)
                 .map(|change: similar::Change<_>| change.value().to_string())
                 .collect::<Vec<String>>()
-                .join("")
+                .join(" ")
             })
             .zip(
                 self.content
