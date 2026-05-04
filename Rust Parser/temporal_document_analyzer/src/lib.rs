@@ -1,3 +1,4 @@
+use csv;
 use rayon::{self, join};
 use similar::{self, ChangeTag, DiffableStr, DiffableStrRef, TextDiff};
 use std::collections::HashMap;
@@ -6,39 +7,95 @@ use undoc::docx::DocxParser;
 use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
 use walkdir::WalkDir;
 
-pub fn hash_people(path: &Path) -> HashMap<String, PersonHistory> {
-    let mut people_hash: HashMap<String, NewPerson> = HashMap::new();
-    WalkDir::new(path)
-        .max_depth(3)
-        .min_depth(3)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.metadata().unwrap().is_file())
-        .for_each(|file| {
-            let filename = file
-                .path()
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned();
-            people_hash
-                .entry(filename.clone())
-                .and_modify(|person| person.add_path(file.path().to_string_lossy().into_owned()))
-                .or_insert(NewPerson::build(
-                    filename,
-                    file.path().to_string_lossy().into_owned(),
-                ));
-        });
-    people_hash
-        .into_iter()
-        .map(|(k, v)| (k, v.construct_history()))
-        .collect()
+pub struct DatabaseHistory {
+    summary_stats: SummaryStats,
+    hash: HashMap<String, PersonHistory>,
+}
+impl DatabaseHistory {
+    pub fn build(path: &Path) -> DatabaseHistory {
+        let hash = Self::hash_people(path);
+        DatabaseHistory {
+            summary_stats: SummaryStats::build(&hash),
+            hash: hash,
+        }
+    }
+
+    pub fn print_changelist(&self) {
+        self.hash.iter().for_each(|(_, x)| x.print_history());
+    }
+
+    fn hash_people(path: &Path) -> HashMap<String, PersonHistory> {
+        let mut people_hash: HashMap<String, NewPerson> = HashMap::new();
+        WalkDir::new(path)
+            .max_depth(3)
+            .min_depth(3)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.metadata().unwrap().is_file())
+            .for_each(|file| {
+                let filename = file
+                    .path()
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned();
+                people_hash
+                    .entry(filename.clone())
+                    .and_modify(|person| {
+                        person.add_path(file.path().to_string_lossy().into_owned())
+                    })
+                    .or_insert(NewPerson::build(
+                        filename,
+                        file.path().to_string_lossy().into_owned(),
+                    ));
+            });
+        people_hash
+            .into_iter()
+            .map(|(k, v)| (k, v.construct_history()))
+            .collect()
+    }
+}
+
+struct SummaryStats {
+    wordcount: Vec<u32>,
+    file_size: Vec<u64>,
+    people: Vec<String>,
+}
+
+impl SummaryStats {
+    fn build(map: &HashMap<String, PersonHistory>) -> SummaryStats {
+        let mut people: Vec<String> = Vec::new();
+        map.iter().for_each(|(k, _)| people.push(k.clone()));
+        SummaryStats {
+            wordcount: people
+                .iter()
+                .map(|person| {
+                    map.get(person)
+                        .expect("Couldn't find a person's data based on their name.")
+                        .get_final_text()
+                        .unicode_words()
+                        .count() as u32
+                })
+                .collect(),
+            file_size: people
+                .iter()
+                .map(|person| {
+                    map.get(person)
+                        .expect("Couldn't find a person's data based on their name.")
+                        .get_final_file_size()
+                        .clone()
+                })
+                .collect(),
+            people,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct File_Instance {
     path: String,
     time: String,
+    filesize: u64,
     text: String,
 }
 impl File_Instance {
@@ -52,12 +109,19 @@ impl File_Instance {
                 .as_os_str()
                 .to_string_lossy()
                 .to_string(),
+            filesize: fs::metadata(&path).unwrap().len(),
             text: DocxParser::open(path)
                 .expect("Could not open a file.")
                 .parse()
                 .unwrap()
                 .plain_text(),
         }
+    }
+    pub fn get_text(&self) -> &String {
+        &self.text
+    }
+    pub fn get_size(&self) -> &u64 {
+        &self.filesize
     }
 }
 
@@ -160,5 +224,19 @@ impl PersonHistory {
         self.diffmap
             .iter()
             .for_each(|x| println!("For time {}, \"{}\"", x.get_timeperiod(), x.get_edits()));
+    }
+    pub fn get_final_text(&self) -> &String {
+        self.content
+            .iter()
+            .max_by_key(|x| x.time.clone())
+            .expect("Couldn't find max time period.")
+            .get_text()
+    }
+    pub fn get_final_file_size(&self) -> &u64 {
+        self.content
+            .iter()
+            .max_by_key(|x| x.time.clone())
+            .expect("Couldn't find max time period.")
+            .get_size()
     }
 }
