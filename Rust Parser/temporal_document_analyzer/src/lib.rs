@@ -4,6 +4,8 @@ use rayon::{self, join};
 use serde::Serialize;
 use similar::{self, ChangeTag, DiffableStr, DiffableStrRef, TextDiff};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 use std::{fs, path::Path};
 use undoc::docx::DocxParser;
 use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
@@ -58,12 +60,18 @@ impl DatabaseHistory {
             panic!("The ouput path provided already exists. Executuion has been halted to prevent overriding data.")
             // This is the wrong place for this check!!! Move it to the user-interfacing commands when possible
         }
+        //println!("{:?}", path.join("AWA.csv"));
+        fs::create_dir_all(path).expect("Couldn't create file structure.");
         let mut wtr = csv::Writer::from_path(path.join("PeopleInfo.csv"))
             .expect("Couldn't open saving path.");
         self.hash
             .iter()
             .for_each(|(_, v)| wtr.serialize(v).expect("Writing problem."));
         wtr.flush().unwrap();
+        let person_data_path = path.join("People");
+        self.hash
+            .iter()
+            .for_each(|(_, person)| person.write(&person_data_path));
     }
 }
 
@@ -118,6 +126,15 @@ impl EditInstance {
     }
     pub fn get_timeperiod(&self) -> &String {
         &self.time
+    }
+    pub fn write(&self, path: &Path) {
+        let time_path = path.join(&self.time);
+        fs::create_dir_all(&time_path).expect("Couldn't create file structure.");
+        let mut time_text_file =
+            File::create(time_path.join("Additions.txt")).expect("Couldn't create a new file.");
+        time_text_file
+            .write_all(&self.changes.as_bytes())
+            .expect("Could not write additions file.");
     }
 }
 
@@ -223,5 +240,15 @@ impl PersonHistory {
         self.diffmap
             .iter()
             .for_each(|x| println!("For time {}, \"{}\"", x.get_timeperiod(), x.get_edits()));
+    }
+    pub fn write(&self, path: &Path) {
+        let my_path = path.join(&self.filename);
+        fs::create_dir_all(&my_path).expect("Couldn't create file structure.");
+        let mut final_text_file =
+            File::create(my_path.join("FinalText.txt")).expect("Couldn't create a new file.");
+        final_text_file
+            .write_all(&self.final_text.as_bytes())
+            .expect("Could not write final text state.");
+        self.diffmap.iter().for_each(|x| x.write(&my_path));
     }
 }
