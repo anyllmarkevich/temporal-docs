@@ -10,16 +10,12 @@ use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
 use walkdir::WalkDir;
 
 pub struct DatabaseHistory {
-    summary_stats: SummaryStats,
     hash: HashMap<String, PersonHistory>,
 }
 impl DatabaseHistory {
     pub fn build(path: &Path) -> DatabaseHistory {
         let hash = Self::hash_people(path);
-        DatabaseHistory {
-            summary_stats: SummaryStats::build(&hash),
-            hash: hash,
-        }
+        DatabaseHistory { hash: hash }
     }
 
     pub fn print_changelist(&self) {
@@ -65,43 +61,7 @@ impl DatabaseHistory {
     }
 }
 
-#[derive(Serialize)]
-struct SummaryStats {
-    wordcount: Vec<u32>,
-    file_size: Vec<u64>,
-    people: Vec<String>,
-}
-
-impl SummaryStats {
-    fn build(map: &HashMap<String, PersonHistory>) -> SummaryStats {
-        let mut people: Vec<String> = Vec::new();
-        map.iter().for_each(|(k, _)| people.push(k.clone()));
-        SummaryStats {
-            wordcount: people
-                .iter()
-                .map(|person| {
-                    map.get(person)
-                        .expect("Couldn't find a person's data based on their name.")
-                        .get_final_text()
-                        .unicode_words()
-                        .count() as u32
-                })
-                .collect(),
-            file_size: people
-                .iter()
-                .map(|person| {
-                    map.get(person)
-                        .expect("Couldn't find a person's data based on their name.")
-                        .get_final_file_size()
-                        .clone()
-                })
-                .collect(),
-            people,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FileInstance {
     path: String,
     time: String,
@@ -173,11 +133,7 @@ impl NewPerson {
         self.content.sort_by_key(|s| s.path.clone());
     }
     pub fn construct_history(self) -> PersonHistory {
-        PersonHistory {
-            diffmap: self.find_diffs(),
-            filename: self.filename,
-            content: self.content,
-        }
+        PersonHistory::build(self)
     }
     fn find_diffs(&self) -> Vec<EditInstance> {
         let mut diffs_vec: Vec<EditInstance> = self
@@ -221,32 +177,45 @@ impl NewPerson {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct PersonHistory {
-    diffmap: Vec<EditInstance>,
     filename: String,
+    filesize: u64,
+    wordcount: u32,
+    #[serde(skip_serializing)]
     content: Vec<FileInstance>,
+    #[serde(skip_serializing)]
+    diffmap: Vec<EditInstance>,
+    final_text: String,
 }
 impl PersonHistory {
+    pub fn build(person: NewPerson) -> PersonHistory {
+        let diffmap = person.find_diffs();
+        let content = person.content;
+        let final_text = content
+            .iter()
+            .max_by_key(|x| x.time.clone())
+            .expect("Couldn't find max time period.")
+            .get_text()
+            .to_string();
+        PersonHistory {
+            filename: person.filename,
+            filesize: *content
+                .iter()
+                .max_by_key(|x| x.time.clone())
+                .expect("Couldn't find max time period.")
+                .get_size(),
+            wordcount: final_text.unicode_words().count() as u32,
+            content,
+            diffmap,
+            final_text,
+        }
+    }
     pub fn print_history(&self) {
         println!("———————————————————————————");
         println!("Printing hisotry from filenames \"{}\".", self.filename);
         self.diffmap
             .iter()
             .for_each(|x| println!("For time {}, \"{}\"", x.get_timeperiod(), x.get_edits()));
-    }
-    pub fn get_final_text(&self) -> &String {
-        self.content
-            .iter()
-            .max_by_key(|x| x.time.clone())
-            .expect("Couldn't find max time period.")
-            .get_text()
-    }
-    pub fn get_final_file_size(&self) -> &u64 {
-        self.content
-            .iter()
-            .max_by_key(|x| x.time.clone())
-            .expect("Couldn't find max time period.")
-            .get_size()
     }
 }
