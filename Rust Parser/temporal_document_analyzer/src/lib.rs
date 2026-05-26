@@ -58,6 +58,12 @@ impl DatabaseHistory {
             panic!("The ouput path provided already exists. Executuion has been halted to prevent overriding data.")
             // This is the wrong place for this check!!! Move it to the user-interfacing commands when possible
         }
+        let mut wtr = csv::Writer::from_path(path.join("PeopleInfo.csv"))
+            .expect("Couldn't open saving path.");
+        self.hash
+            .iter()
+            .for_each(|(_, v)| wtr.serialize(v).expect("Writing problem."));
+        wtr.flush().unwrap();
     }
 }
 
