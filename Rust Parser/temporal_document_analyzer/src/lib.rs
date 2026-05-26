@@ -1,5 +1,7 @@
+use core::panic;
 use csv;
 use rayon::{self, join};
+use serde::Serialize;
 use similar::{self, ChangeTag, DiffableStr, DiffableStrRef, TextDiff};
 use std::collections::HashMap;
 use std::{fs, path::Path};
@@ -54,8 +56,16 @@ impl DatabaseHistory {
             .map(|(k, v)| (k, v.construct_history()))
             .collect()
     }
+
+    pub fn save(&self, path: &Path) {
+        if path.exists() {
+            panic!("The ouput path provided already exists. Executuion has been halted to prevent overriding data.")
+            // This is the wrong place for this check!!! Move it to the user-interfacing commands when possible
+        }
+    }
 }
 
+#[derive(Serialize)]
 struct SummaryStats {
     wordcount: Vec<u32>,
     file_size: Vec<u64>,
