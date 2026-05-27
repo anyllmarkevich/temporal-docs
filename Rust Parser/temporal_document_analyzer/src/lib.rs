@@ -4,6 +4,7 @@ use rayon::{self, join};
 use serde::Serialize;
 use similar::{self, ChangeTag, DiffableStr, DiffableStrRef, TextDiff};
 use std::collections::HashMap;
+use std::fmt::format;
 use std::fs::File;
 use std::io::Write;
 use std::{
@@ -123,16 +124,21 @@ impl FileInstance {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EditInstance {
     time: String,
+    change_wordcount: u32,
+    change_sentence_count: u32,
+    #[serde(skip_serializing)]
     changes: String,
 }
 impl EditInstance {
     fn new(timeperiod: String, changes: String) -> EditInstance {
         EditInstance {
             time: timeperiod,
-            changes: changes,
+            change_wordcount: changes.unicode_words().count() as u32,
+            change_sentence_count: changes.unicode_sentences().count() as u32,
+            changes,
         }
     }
     pub fn get_edits(&self) -> &String {
@@ -270,8 +276,9 @@ impl PersonHistory {
             csv::Writer::from_path(my_path.join("timeperiod.csv")).expect("Failed to open path.");
         self.diffmap.iter().for_each(|x| {
             timeperiod_wtr
-                .write_record(&[x.write(&my_path)])
-                .expect("Failed to write.")
+                .serialize(x)
+                .expect("Failed to serialize edit.");
+            x.write(&my_path.join("Times"));
         });
         my_path
     }
