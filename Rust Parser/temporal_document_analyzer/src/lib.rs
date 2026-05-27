@@ -82,7 +82,13 @@ impl DatabaseHistory {
             people_data_paths_wtr
                 .write_record(&[
                     person.get_name(),
-                    &person_path.into_os_string().into_string().unwrap(),
+                    &person_path
+                        .components()
+                        .skip(path.components().count())
+                        .collect::<PathBuf>()
+                        .into_os_string()
+                        .into_string()
+                        .unwrap(),
                 ])
                 .expect("Writing issue.")
         });
