@@ -74,8 +74,10 @@ impl DatabaseHistory {
         let person_data_path = path.join("People");
         let mut people_data_paths_wtr = csv::Writer::from_path(path.join("PeopleInfo.csv"))
             .expect("Couldn't open saving path.");
-        let _ = self.hash.iter().for_each(|(_, person)| {
+        self.hash.iter().for_each(|(_, person)| {
+            // Both output a file containing summary statistics for a person and save the generated file path for that person to memory.
             let person_path = person.write(&person_data_path);
+            // Save a CSV containing paths to people's data.
             people_data_paths_wtr
                 .write_record(&[
                     person.get_name(),
