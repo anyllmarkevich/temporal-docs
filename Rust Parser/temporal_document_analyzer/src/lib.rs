@@ -141,7 +141,7 @@ impl EditInstance {
     pub fn get_timeperiod(&self) -> &String {
         &self.time
     }
-    pub fn write(&self, path: &Path) {
+    pub fn write(&self, path: &Path) -> &String {
         let time_path = path.join(&self.time);
         fs::create_dir_all(&time_path).expect("Couldn't create file structure.");
         let mut time_text_file =
@@ -149,6 +149,7 @@ impl EditInstance {
         time_text_file
             .write_all(&self.changes.as_bytes())
             .expect("Could not write additions file.");
+        &self.time
     }
 }
 
@@ -264,7 +265,13 @@ impl PersonHistory {
         final_text_file
             .write_all(&self.final_text.as_bytes())
             .expect("Could not write final text state.");
-        self.diffmap.iter().for_each(|x| x.write(&my_path));
+        let mut timeperiod_wtr =
+            csv::Writer::from_path(my_path.join("timeperiod.csv")).expect("Failed to open path.");
+        self.diffmap.iter().for_each(|x| {
+            timeperiod_wtr
+                .write_record(&[x.write(&my_path)])
+                .expect("Failed to write.")
+        });
         my_path
     }
     pub fn get_name(&self) -> &String {
