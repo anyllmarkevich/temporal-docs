@@ -173,6 +173,7 @@ impl NewPerson {
     pub fn construct_history(self) -> PersonHistory {
         PersonHistory::build(self)
     }
+    /// This function compares each snapshot of a person's writing and finds changes between each version.
     fn find_diffs(&self) -> Vec<EditInstance> {
         let mut diffs_vec: Vec<EditInstance> = self
             .content
