@@ -6,7 +6,10 @@ use similar::{self, ChangeTag, DiffableStr, DiffableStrRef, TextDiff};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Write;
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use undoc::docx::DocxParser;
 use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
 use walkdir::WalkDir;
@@ -62,16 +65,25 @@ impl DatabaseHistory {
         }
         //println!("{:?}", path.join("AWA.csv"));
         fs::create_dir_all(path).expect("Couldn't create file structure.");
-        let mut wtr = csv::Writer::from_path(path.join("PeopleInfo.csv"))
+        let mut summary_wtr = csv::Writer::from_path(path.join("PeopleSummary.csv"))
             .expect("Couldn't open saving path.");
         self.hash
             .iter()
-            .for_each(|(_, v)| wtr.serialize(v).expect("Writing problem."));
-        wtr.flush().unwrap();
+            .for_each(|(_, v)| summary_wtr.serialize(v).expect("Writing problem."));
+        summary_wtr.flush().unwrap();
         let person_data_path = path.join("People");
-        self.hash
-            .iter()
-            .for_each(|(_, person)| person.write(&person_data_path));
+        let mut people_data_paths_wtr = csv::Writer::from_path(path.join("PeopleInfo.csv"))
+            .expect("Couldn't open saving path.");
+        let _ = self.hash.iter().for_each(|(_, person)| {
+            let person_path = person.write(&person_data_path);
+            people_data_paths_wtr
+                .write_record(&[
+                    person.get_name(),
+                    &person_path.into_os_string().into_string().unwrap(),
+                ])
+                .expect("Writing issue.")
+        });
+        people_data_paths_wtr.flush().unwrap()
     }
 }
 
@@ -209,6 +221,7 @@ pub struct PersonHistory {
     content: Vec<FileInstance>,
     #[serde(skip_serializing)]
     diffmap: Vec<EditInstance>,
+    #[serde(skip_serializing)]
     final_text: String,
 }
 impl PersonHistory {
@@ -241,7 +254,7 @@ impl PersonHistory {
             .iter()
             .for_each(|x| println!("For time {}, \"{}\"", x.get_timeperiod(), x.get_edits()));
     }
-    pub fn write(&self, path: &Path) {
+    pub fn write(&self, path: &Path) -> PathBuf {
         let my_path = path.join(&self.filename);
         fs::create_dir_all(&my_path).expect("Couldn't create file structure.");
         let mut final_text_file =
@@ -250,5 +263,9 @@ impl PersonHistory {
             .write_all(&self.final_text.as_bytes())
             .expect("Could not write final text state.");
         self.diffmap.iter().for_each(|x| x.write(&my_path));
+        my_path
+    }
+    pub fn get_name(&self) -> &String {
+        &self.filename
     }
 }
