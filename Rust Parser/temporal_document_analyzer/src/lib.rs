@@ -36,8 +36,12 @@ impl DatabaseHistory {
             .min_depth(3)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| e.metadata().unwrap().is_file())
-            .for_each(|file| {
+            .filter(|e| {
+                e.metadata()
+                    .expect("Could not access metadata for input files")
+                    .is_file()
+            })
+            .try_for_each(|file| -> Result<(), Box<dyn Error>> {
                 let filename = file.path().file_name()?.to_string_lossy().into_owned();
                 people_hash
                     .entry(filename.clone())
@@ -48,6 +52,7 @@ impl DatabaseHistory {
                         filename,
                         file.path().to_string_lossy().into_owned(),
                     ));
+                Ok(())
             });
         Ok(people_hash
             .into_iter()
