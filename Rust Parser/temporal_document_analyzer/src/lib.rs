@@ -4,6 +4,7 @@ use rayon::{self, join};
 use serde::Serialize;
 use similar::{self, ChangeTag, DiffableStr, DiffableStrRef, TextDiff};
 use std::collections::HashMap;
+use std::error::Error;
 use std::fmt::format;
 use std::fs::File;
 use std::io::Write;
@@ -19,16 +20,16 @@ pub struct DatabaseHistory {
     hash: HashMap<String, PersonHistory>,
 }
 impl DatabaseHistory {
-    pub fn build(path: &Path) -> DatabaseHistory {
-        let hash = Self::hash_people(path);
-        DatabaseHistory { hash: hash }
+    pub fn build(path: &Path) -> Result<DatabaseHistory, Box<dyn Error>> {
+        let hash = Self::hash_people(path)?;
+        Ok(DatabaseHistory { hash: hash })
     }
 
     pub fn print_changelist(&self) {
         self.hash.iter().for_each(|(_, x)| x.print_history());
     }
 
-    fn hash_people(path: &Path) -> HashMap<String, PersonHistory> {
+    fn hash_people(path: &Path) -> Result<HashMap<String, PersonHistory>, Box<dyn Error>> {
         let mut people_hash: HashMap<String, NewPerson> = HashMap::new();
         WalkDir::new(path)
             .max_depth(3)
@@ -37,12 +38,7 @@ impl DatabaseHistory {
             .filter_map(|e| e.ok())
             .filter(|e| e.metadata().unwrap().is_file())
             .for_each(|file| {
-                let filename = file
-                    .path()
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .into_owned();
+                let filename = file.path().file_name()?.to_string_lossy().into_owned();
                 people_hash
                     .entry(filename.clone())
                     .and_modify(|person| {
@@ -53,10 +49,10 @@ impl DatabaseHistory {
                         file.path().to_string_lossy().into_owned(),
                     ));
             });
-        people_hash
+        Ok(people_hash
             .into_iter()
             .map(|(k, v)| (k, v.construct_history()))
-            .collect()
+            .collect())
     }
 
     pub fn save(&self, path: &Path) {
