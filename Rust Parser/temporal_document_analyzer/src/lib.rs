@@ -136,19 +136,26 @@ pub struct EditInstance {
     change_wordcount: u32,
     change_sentence_count: u32,
     #[serde(skip_serializing)]
-    changes: String,
+    sentence_additions: String,
+    #[serde(skip_serializing)]
+    sentence_deletions: String,
 }
 impl EditInstance {
-    fn new(timeperiod: String, changes: String) -> EditInstance {
+    fn new(
+        timeperiod: String,
+        sentence_additions: String,
+        sentence_deletions: String,
+    ) -> EditInstance {
         EditInstance {
             time: timeperiod,
-            change_wordcount: changes.unicode_words().count() as u32,
-            change_sentence_count: changes.unicode_sentences().count() as u32,
-            changes,
+            change_wordcount: sentence_additions.unicode_words().count() as u32,
+            change_sentence_count: sentence_additions.unicode_sentences().count() as u32,
+            sentence_additions,
+            sentence_deletions,
         }
     }
     pub fn get_edits(&self) -> &String {
-        &self.changes
+        &self.sentence_additions
     }
     pub fn get_timeperiod(&self) -> &String {
         &self.time
@@ -156,11 +163,18 @@ impl EditInstance {
     pub fn write(&self, path: &Path) -> &String {
         let time_path = path.join(&self.time);
         fs::create_dir_all(&time_path).expect("Couldn't create file structure.");
-        let mut time_text_file =
-            File::create(time_path.join("Additions.txt")).expect("Couldn't create a new file.");
-        time_text_file
-            .write_all(&self.changes.as_bytes())
+        let mut additions_text_file = File::create(time_path.join("SentenceAdditions.txt"))
+            .expect("Couldn't create a new file.");
+        additions_text_file
+            .write_all(&self.sentence_additions.as_bytes())
             .expect("Could not write additions file.");
+        additions_text_file.flush();
+        let mut deletions_text_file = File::create(time_path.join("SentenceDeletions.txt"))
+            .expect("Couldn't create a new file.");
+        deletions_text_file
+            .write_all(&self.sentence_deletions.as_bytes())
+            .expect("Could not write additions file.");
+        deletions_text_file.flush();
         &self.time
     }
 }
@@ -185,6 +199,8 @@ impl NewPerson {
     pub fn construct_history(self) -> PersonHistory {
         PersonHistory::build(self)
     }
+
+    // Conveniently extracts changes with a specific tag as a String.
     fn tag_to_string<T: similar::DiffableStr + ToString + ?Sized>(
         diff: &TextDiff<T>,
         tag: ChangeTag,
@@ -240,12 +256,16 @@ impl NewPerson {
                     .into_iter()
                     .collect::<Vec<String>>(),
             )
-            .map(|((diffs, _), time)| EditInstance::new(time, diffs.to_string()))
+            .map(|((adds, dels), time)| EditInstance::new(time, adds.to_string(), dels.to_string()))
             .collect();
         // Add all text from the first timeperiod as a change as this initial text is not considered by the comparison algorithm.
         diffs_vec.insert(
             0,
-            EditInstance::new(self.content[0].time.clone(), self.content[0].text.clone()),
+            EditInstance::new(
+                self.content[0].time.clone(),
+                self.content[0].text.clone(),
+                String::new(),
+            ),
         );
         diffs_vec
     }
