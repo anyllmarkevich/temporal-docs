@@ -185,13 +185,26 @@ impl NewPerson {
     pub fn construct_history(self) -> PersonHistory {
         PersonHistory::build(self)
     }
+    fn tag_to_string<T: similar::DiffableStr + ToString + ?Sized>(
+        diff: &TextDiff<T>,
+        tag: ChangeTag,
+    ) -> String {
+        diff.iter_all_changes()
+            .filter(|change| change.tag() == tag)
+            .map(|change: similar::Change<_>| change.value().to_string())
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
     /// This function compares each snapshot of a person's writing and finds changes between each version.
     fn find_diffs(&self) -> Vec<EditInstance> {
-        let mut diffs_vec: Vec<EditInstance> = self
+        // Extract raw text data from each timeperiod snapshot.
+        let raw_text: Vec<String> = self
             .content
             .iter()
             .map(|instance| instance.text.clone())
-            .collect::<Vec<String>>()
+            .collect::<Vec<String>>();
+        // Create comparison objects for each timeperiod.
+        let linediffs_vec: Vec<TextDiff<'_, '_, str>> = raw_text
             .windows(2)
             .map(|window| {
                 TextDiff::from_slices(
@@ -204,12 +217,21 @@ impl NewPerson {
                         .map(|x| x.as_str().unwrap().trim())
                         .collect::<Vec<&str>>(),
                 )
-                .iter_all_changes()
-                .filter(|change| change.tag() == ChangeTag::Insert)
-                .map(|change: similar::Change<_>| change.value().to_string())
-                .collect::<Vec<String>>()
-                .join(" ")
             })
+            .collect();
+        // Convert these comparison objects into addition and deletion strings within a tuple for each timeperiod.
+        let adds_dels_vec: Vec<(String, String)> = linediffs_vec
+            .iter()
+            .map(|change_period| {
+                (
+                    Self::tag_to_string(change_period, ChangeTag::Insert),
+                    Self::tag_to_string(change_period, ChangeTag::Delete),
+                )
+            })
+            .collect();
+        // Save these addition and deletion strings into a struct that also contains timeperiod information.
+        let mut diffs_vec: Vec<EditInstance> = adds_dels_vec
+            .iter()
             .zip(
                 self.content
                     .iter()
@@ -218,8 +240,9 @@ impl NewPerson {
                     .into_iter()
                     .collect::<Vec<String>>(),
             )
-            .map(|(diffs, time)| EditInstance::new(time, diffs))
+            .map(|((diffs, _), time)| EditInstance::new(time, diffs.to_string()))
             .collect();
+        // Add all text from the first timeperiod as a change as this initial text is not considered by the comparison algorithm.
         diffs_vec.insert(
             0,
             EditInstance::new(self.content[0].time.clone(), self.content[0].text.clone()),
