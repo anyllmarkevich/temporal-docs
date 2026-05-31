@@ -140,15 +140,27 @@ pub struct EditInstance {
     sentence_additions: String,
     #[serde(skip_serializing)]
     sentence_edits: String,
+    #[serde(skip_serializing)]
+    word_additions: String,
+    #[serde(skip_serializing)]
+    word_deletions: String,
 }
 impl EditInstance {
-    fn new(timeperiod: String, sentence_additions: String, sentence_edits: String) -> EditInstance {
+    fn new(
+        timeperiod: String,
+        sentence_additions: String,
+        sentence_edits: String,
+        word_additions: String,
+        word_deletions: String,
+    ) -> EditInstance {
         EditInstance {
             time: timeperiod,
             change_wordcount: sentence_additions.unicode_words().count() as u32,
             change_sentence_count: sentence_additions.unicode_sentences().count() as u32,
             sentence_additions,
             sentence_edits,
+            word_additions,
+            word_deletions,
         }
     }
     pub fn get_edits(&self) -> &String {
@@ -174,6 +186,10 @@ impl EditInstance {
         )
         .expect("Failed to save data");
         Self::save_to_file(&time_path, "SentenceEdits.txt", &self.sentence_edits)
+            .expect("Failed to save data");
+        Self::save_to_file(&time_path, "WordAdditions.txt", &self.word_additions)
+            .expect("Failed to save data");
+        Self::save_to_file(&time_path, "WordDeletions.txt", &self.word_deletions)
             .expect("Failed to save data");
         &self.time
     }
@@ -244,13 +260,20 @@ impl NewPerson {
                 )
             })
             .collect();
+        let worddiffs_vec: Vec<TextDiff<'_, '_, str>> = raw_text
+            .windows(2)
+            .map(|window| TextDiff::from_words(&window[0], &window[1]))
+            .collect();
         // Convert these comparison objects into addition and deletion strings within a tuple for each timeperiod.
-        let adds_dels_vec: Vec<(String, String)> = linediffs_vec
+        let adds_dels_vec: Vec<(String, String, String, String)> = linediffs_vec
             .iter()
-            .map(|change_period| {
+            .zip(worddiffs_vec)
+            .map(|(sentence_period, word_period)| {
                 (
-                    Self::tag_to_string(change_period, ChangeTag::Insert),
-                    Self::edit_to_string(change_period),
+                    Self::tag_to_string(sentence_period, ChangeTag::Insert),
+                    Self::edit_to_string(sentence_period),
+                    Self::tag_to_string(&word_period, ChangeTag::Insert),
+                    Self::tag_to_string(&word_period, ChangeTag::Delete),
                 )
             })
             .collect();
@@ -265,8 +288,14 @@ impl NewPerson {
                     .into_iter()
                     .collect::<Vec<String>>(),
             )
-            .map(|((adds, edits), time)| {
-                EditInstance::new(time, adds.to_string(), edits.to_string())
+            .map(|((s_adds, s_edits, w_adds, w_dels), time)| {
+                EditInstance::new(
+                    time,
+                    s_adds.to_string(),
+                    s_edits.to_string(),
+                    w_adds.to_string(),
+                    w_dels.to_string(),
+                )
             })
             .collect();
         // Add all text from the first timeperiod as a change as this initial text is not considered by the comparison algorithm.
@@ -276,6 +305,8 @@ impl NewPerson {
                 self.content[0].time.clone(),
                 self.content[0].text.clone(),
                 self.content[0].text.clone(),
+                self.content[0].text.clone(),
+                String::new(),
             ),
         );
         diffs_vec
