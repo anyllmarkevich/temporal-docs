@@ -1,5 +1,6 @@
 # Temporal Document Analyzer
-This repository converts organized snapshots of Microsoft Word files from multiple authors into a temporal data about edits, additions, and deletions made by each author between snapshots, all nicely formatted in R objects to aide analysis. Note this program **does not** provide the detailed timestamp data logged by the "track changes" feature common among most word processing software. This program is intended as a coarse and easily managed data extraction tool, not a document history tracker.
+This repository converts organized snapshots of Microsoft Word files from multiple authors into a temporal data about edits, additions, and deletions made by each author between snapshots, all nicely formatted in R objects to aide analysis. 
+> **Note:** this program ***does not*** provide the detailed timestamp data logged by the "track changes" feature common among most word processing software. This program is intended as a coarse and easily managed data extraction tool, not a document history tracker.
 
 Although this functionality is conceptually useful in many fields, our aim is to aide educators, who are often faced with the challenge of understanding student educational journeys beyond the reductive metric of assignment letter grades. This repository can help educators and education researchers gain insights into what students are learning, the challenges they face, and the unique trajectories of every student by making temporal data about student notebooks readily accessible for analysis in R.
 ## Pedagogical Setup
