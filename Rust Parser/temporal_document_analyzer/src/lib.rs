@@ -16,6 +16,17 @@ use undoc::docx::DocxParser;
 use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
 use walkdir::WalkDir;
 
+/// This struct captures and saves a complete record of the every document written by every person, along with a complete record of changes between time periods.
+/// # Example Usage
+/// ```
+/// use std::path::{self, Path};
+/// use temporal_document_analyzer::{self, DatabaseHistory};
+/// let input_path = Path::new("~/users/example_user/data_folder/");
+/// let output_path = Path::new("~/users/example_user/save_folder/");
+/// let database = DatabaseHistory::build(input_path); // Create database and calculate edit history
+/// database.print_changelist(); // Print changes to the console
+/// database.save(output_path); // Save final text and edit history for every person into a directory, easily readable using accompanying R functions
+/// ```
 pub struct DatabaseHistory {
     hash: HashMap<String, PersonHistory>,
 }
