@@ -12,6 +12,9 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+use strum::Display;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
 
 #[derive(Debug, Clone)]
@@ -94,17 +97,6 @@ impl EditInstance {
             .join(" ")
     }
 
-    /// Output a vector containing the filenames of each types of data saved, such as sentence-level additions and edits.
-    // Update this function to include new save types if any new output text types are added. This will allow R to properly load whatever new data is being produced.
-    pub fn list_savetypes() -> Vec<String> {
-        vec![
-            "SentenceAdditions".to_string(),
-            "SentenceEdits".to_string(),
-            "WordAdditions".to_string(),
-            "WordDeletions".to_string(),
-        ]
-    }
-
     fn save_to_file(path: &Path, filename: &str, content: &String) -> Result<(), io::Error> {
         fs::create_dir_all(&path)?;
         let mut text_file = File::create(path.join(filename))?;
@@ -127,5 +119,38 @@ impl EditInstance {
             .expect("Failed to save data");
         Self::save_to_file(&time_path, "WordDeletions.txt", &self.word_deletions)
             .expect("Failed to save data");
+        Self::save_to_file(&time_path, "Text.txt", &self.text).expect("Failed to save data")
+    }
+
+    pub fn get_text(&self, of_type: SaveType) -> &String {
+        match of_type {
+            SaveType::SentenceAdditions => &self.sentence_additions,
+            SaveType::SentenceEdits => &self.sentence_edits,
+            SaveType::WordAdditions => &self.word_additions,
+            SaveType::WordDeletions => &self.word_deletions,
+            SaveType::Text => &self.text,
+        }
+    }
+}
+
+// Update this enum to include new save types if any new output text types are added. This will allow R to properly load whatever new data is being produced.
+#[derive(Debug, Display, EnumIter)]
+pub enum SaveType {
+    #[strum(serialize = "SentenceAdditions")]
+    SentenceAdditions,
+    #[strum(serialize = "SentenceEdits")]
+    SentenceEdits,
+    #[strum(serialize = "WordAdditions")]
+    WordAdditions,
+    #[strum(serialize = "WordDeletions")]
+    WordDeletions,
+    #[strum(serialize = "Text")]
+    Text,
+}
+
+impl SaveType {
+    /// Output a vector containing the filenames of each types of data saved, such as sentence-level additions and edits.
+    pub fn list_savetypes() -> Vec<String> {
+        Self::iter().map(|x| x.to_string()).collect()
     }
 }

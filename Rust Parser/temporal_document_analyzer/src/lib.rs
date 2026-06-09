@@ -1,5 +1,5 @@
 pub mod text_edits;
-use core::panic;
+use core::{panic, time};
 use csv;
 use rayon::{self, join};
 use serde::de::Error;
@@ -13,7 +13,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-use text_edits::EditInstance;
+use text_edits::*;
 use undoc::docx::DocxParser;
 use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
 use walkdir::WalkDir;
@@ -108,7 +108,7 @@ impl DatabaseHistory {
         people_data_paths_wtr.flush().unwrap();
         let mut savetype_wtr =
             csv::Writer::from_path(path.join("SaveType.csv")).expect("Could not open saving path.");
-        EditInstance::list_savetypes()
+        SaveType::list_savetypes()
             .iter()
             .for_each(|x| savetype_wtr.write_record(&[x]).expect("Writing issue."));
         savetype_wtr.flush().unwrap();
@@ -147,6 +147,9 @@ impl FileInstance {
     pub fn get_size(&self) -> &u64 {
         &self.filesize
     }
+    pub fn get_time_period(&self) -> &String {
+        &self.time
+    }
 }
 
 #[derive(Debug)]
@@ -179,19 +182,28 @@ pub struct PersonHistory {
     #[serde(skip_serializing)]
     content: Vec<FileInstance>,
     #[serde(skip_serializing)]
-    diffmap: Vec<EditInstance>,
+    diffmap: Vec<(String, EditInstance)>,
     #[serde(skip_serializing)]
     final_text: String,
 }
 impl PersonHistory {
     pub fn build(person: NewPerson) -> PersonHistory {
-        let diffmap = EditInstance::edits_from_history(
+        let time_periods: Vec<String> = person
+            .content
+            .iter()
+            .map(|file| file.get_time_period().clone())
+            .collect();
+        let diffmap: Vec<(String, EditInstance)> = EditInstance::edits_from_history(
             person
                 .content
                 .iter()
                 .map(|file| file.get_text().clone())
                 .collect::<Vec<String>>(),
-        );
+        )
+        .into_iter()
+        .zip(time_periods)
+        .map(|(edits, time)| (time, edits))
+        .collect();
         let content = person.content;
         let final_text = content
             .iter()
@@ -215,9 +227,13 @@ impl PersonHistory {
     pub fn print_history(&self) {
         println!("———————————————————————————");
         println!("Printing hisotry from filenames \"{}\".", self.filename);
-        self.diffmap
-            .iter()
-            .for_each(|x| println!("For time {}, \"{}\"", x.get_timeperiod(), x.get_edits()));
+        self.diffmap.iter().for_each(|(time, edits)| {
+            println!(
+                "The following words were written during timeperiod {}: \"{}\"",
+                time,
+                edits.get_text(SaveType::WordAdditions)
+            )
+        });
     }
     pub fn write(&self, path: &Path) -> PathBuf {
         let my_path = path.join(&self.filename);
@@ -229,12 +245,13 @@ impl PersonHistory {
             .expect("Could not write final text state.");
         let mut timeperiod_wtr =
             csv::Writer::from_path(my_path.join("timeperiod.csv")).expect("Failed to open path.");
-        self.diffmap.iter().for_each(|x| {
+        self.diffmap.iter().for_each(|(time, edit)| {
             timeperiod_wtr
-                .serialize(x)
+                .write_record(&[time])
                 .expect("Failed to serialize edit.");
-            x.write(&my_path.join("Times"));
+            edit.write(&my_path.join("Times"), time.to_string());
         });
+        timeperiod_wtr.flush().unwrap();
         my_path
     }
     pub fn get_name(&self) -> &String {
