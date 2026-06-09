@@ -45,8 +45,8 @@ impl DatabaseHistory {
     fn hash_people(path: &Path) -> HashMap<String, PersonHistory> {
         let mut people_hash: HashMap<String, NewPerson> = HashMap::new();
         WalkDir::new(path)
-            .max_depth(3)
-            .min_depth(3)
+            .max_depth(2)
+            .min_depth(2)
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| e.metadata().unwrap().is_file())
