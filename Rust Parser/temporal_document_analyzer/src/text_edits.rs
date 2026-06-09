@@ -17,6 +17,7 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
 
+/// Stores a string and the differences between it and another temporally preceding string, including sentence-level additions and edits and word-level additions and deletions.Data can be extracted as strings or saved to files within a specified directory.
 #[derive(Debug, Clone)]
 pub struct EditInstance {
     sentence_additions: String,
@@ -26,7 +27,8 @@ pub struct EditInstance {
     text: String,
 }
 impl EditInstance {
-    fn edit_from_text_comparison(old: &String, current: &String) -> EditInstance {
+    /// Calculate and store data on numerous types of edits between two different snapshots of a document.
+    pub fn edit_from_text_comparison(old: &String, current: &String) -> EditInstance {
         let sentence_diffs: TextDiff<'_, '_, str> = TextDiff::from_slices(
             &old.unicode_sentences()
                 .map(|x| x.as_str().unwrap().trim())
@@ -53,8 +55,8 @@ impl EditInstance {
             text: current.to_string(),
         }
     }
-
-    fn edit_from_text_snapshot(snapshot: &String) -> EditInstance {
+    /// Create and save data on numerous types of edits from a single document snapshot. Although no novel data can be extracted as there is no point of comparison, this function is useful for formatting the initial state of a document in the same structure as future calculated edits. The entire text is assumed to be a novel addition without any deletions.
+    pub fn edit_from_text_snapshot(snapshot: &String) -> EditInstance {
         EditInstance {
             sentence_additions: snapshot.clone(),
             sentence_edits: snapshot.clone(),
@@ -64,7 +66,7 @@ impl EditInstance {
         }
     }
 
-    /// Creates a vector containing all the data extracted about a series of edits from a vector of Strings representing text snapshots.
+    /// Creates a vector containing all data on edits performed between several temporally sequential snapshots of a string. The first version of the string is assumed to comprise a single addition without any deletions.
     pub fn edits_from_history(history: Vec<String>) -> Vec<EditInstance> {
         let mut edits: Vec<EditInstance> = vec![Self::edit_from_text_snapshot(&history[0])];
         edits.append(
@@ -76,7 +78,7 @@ impl EditInstance {
         edits
     }
 
-    // Conveniently extracts changes with any tag except "Change::Equal" as a String.
+    /// Conveniently extracts changes with any tag except "Change::Equal" as a String.
     fn edit_to_string<T: similar::DiffableStr + ToString + ?Sized>(diff: &TextDiff<T>) -> String {
         diff.iter_all_changes()
             .filter(|change| change.tag() == ChangeTag::Delete || change.tag() == ChangeTag::Insert)
@@ -85,7 +87,7 @@ impl EditInstance {
             .join(" ")
     }
 
-    // Conveniently extracts changes with a specific tag as a String.
+    /// Conveniently extracts changes with a specific tag as a String.
     fn tag_to_string<T: similar::DiffableStr + ToString + ?Sized>(
         diff: &TextDiff<T>,
         tag: ChangeTag,
@@ -96,7 +98,7 @@ impl EditInstance {
             .collect::<Vec<String>>()
             .join(" ")
     }
-
+    /// Save a text to an appropriately named file.
     fn save_to_file(path: &Path, filename: &str, content: &String) -> Result<(), io::Error> {
         fs::create_dir_all(&path)?;
         let mut text_file = File::create(path.join(filename))?;
@@ -104,7 +106,7 @@ impl EditInstance {
         text_file.flush()?;
         Ok(())
     }
-
+    /// Save all different edit types to separate text file at a specific path.
     pub fn write(&self, path: &Path, timeperiod_name: String) {
         let time_path = path.join(timeperiod_name);
         Self::save_to_file(
@@ -121,7 +123,7 @@ impl EditInstance {
             .expect("Failed to save data");
         Self::save_to_file(&time_path, "Text.txt", &self.text).expect("Failed to save data")
     }
-
+    /// Return various types of edits or current text, specifying what kind of text is returned using an enum.
     pub fn get_text(&self, of_type: SaveType) -> &String {
         match of_type {
             SaveType::SentenceAdditions => &self.sentence_additions,
