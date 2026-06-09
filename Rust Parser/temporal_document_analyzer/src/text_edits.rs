@@ -23,8 +23,7 @@ pub struct EditInstance {
     text: String,
 }
 impl EditInstance {
-    /// Creates a vector containing all the data extracted about a series of edis from a vector of Strings representing text snapshots.
-    pub fn edit_from_text_comparison(old: &String, current: &String) -> EditInstance {
+    fn edit_from_text_comparison(old: &String, current: &String) -> EditInstance {
         let sentence_diffs: TextDiff<'_, '_, str> = TextDiff::from_slices(
             &old.unicode_sentences()
                 .map(|x| x.as_str().unwrap().trim())
@@ -62,7 +61,8 @@ impl EditInstance {
         }
     }
 
-    fn edits_from_history(history: Vec<String>) -> Vec<EditInstance> {
+    /// Creates a vector containing all the data extracted about a series of edits from a vector of Strings representing text snapshots.
+    pub fn edits_from_history(history: Vec<String>) -> Vec<EditInstance> {
         let mut edits: Vec<EditInstance> = vec![Self::edit_from_text_snapshot(&history[0])];
         edits.append(
             &mut history

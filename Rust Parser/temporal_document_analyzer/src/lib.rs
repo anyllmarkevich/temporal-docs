@@ -169,102 +169,6 @@ impl NewPerson {
     pub fn construct_history(self) -> PersonHistory {
         PersonHistory::build(self)
     }
-
-    // Conveniently extracts changes with any tag except "Change::Equal" as a String.
-    fn edit_to_string<T: similar::DiffableStr + ToString + ?Sized>(diff: &TextDiff<T>) -> String {
-        diff.iter_all_changes()
-            .filter(|change| change.tag() == ChangeTag::Delete || change.tag() == ChangeTag::Insert)
-            .map(|change: similar::Change<_>| change.value().to_string())
-            .collect::<Vec<String>>()
-            .join(" ")
-    }
-
-    // Conveniently extracts changes with a specific tag as a String.
-    fn tag_to_string<T: similar::DiffableStr + ToString + ?Sized>(
-        diff: &TextDiff<T>,
-        tag: ChangeTag,
-    ) -> String {
-        diff.iter_all_changes()
-            .filter(|change| change.tag() == tag)
-            .map(|change: similar::Change<_>| change.value().to_string())
-            .collect::<Vec<String>>()
-            .join(" ")
-    }
-    /// This function compares each snapshot of a person's writing and finds changes between each version.
-    fn find_diffs(&self) -> Vec<EditInstance> {
-        // Extract raw text data from each timeperiod snapshot.
-        let raw_text: Vec<String> = self
-            .content
-            .iter()
-            .map(|instance| instance.text.clone())
-            .collect::<Vec<String>>();
-        // Create comparison objects for each timeperiod.
-        let linediffs_vec: Vec<TextDiff<'_, '_, str>> = raw_text
-            .windows(2)
-            .map(|window| {
-                TextDiff::from_slices(
-                    &window[0]
-                        .unicode_sentences()
-                        .map(|x| x.as_str().unwrap().trim())
-                        .collect::<Vec<&str>>(),
-                    &window[1]
-                        .unicode_sentences()
-                        .map(|x| x.as_str().unwrap().trim())
-                        .collect::<Vec<&str>>(),
-                )
-            })
-            .collect();
-        let worddiffs_vec: Vec<TextDiff<'_, '_, str>> = raw_text
-            .windows(2)
-            .map(|window| TextDiff::from_words(&window[0], &window[1]))
-            .collect();
-        // Convert these comparison objects into addition and deletion strings within a tuple for each timeperiod.
-        let adds_dels_vec: Vec<(String, String, String, String)> = linediffs_vec
-            .iter()
-            .zip(worddiffs_vec)
-            .map(|(sentence_period, word_period)| {
-                (
-                    Self::tag_to_string(sentence_period, ChangeTag::Insert),
-                    Self::edit_to_string(sentence_period),
-                    Self::tag_to_string(&word_period, ChangeTag::Insert),
-                    Self::tag_to_string(&word_period, ChangeTag::Delete),
-                )
-            })
-            .collect();
-        // Save these addition and deletion strings into a struct that also contains timeperiod information.
-        let mut diffs_vec: Vec<EditInstance> = adds_dels_vec
-            .iter()
-            .zip(
-                self.content
-                    .iter()
-                    .skip(1)
-                    .map(|x| x.time.clone())
-                    .into_iter()
-                    .collect::<Vec<String>>(),
-            )
-            .map(|((s_adds, s_edits, w_adds, w_dels), time)| {
-                EditInstance::new(
-                    time,
-                    s_adds.to_string(),
-                    s_edits.to_string(),
-                    w_adds.to_string(),
-                    w_dels.to_string(),
-                )
-            })
-            .collect();
-        // Add all text from the first timeperiod as a change as this initial text is not considered by the comparison algorithm.
-        diffs_vec.insert(
-            0,
-            EditInstance::new(
-                self.content[0].time.clone(),
-                self.content[0].text.clone(),
-                self.content[0].text.clone(),
-                self.content[0].text.clone(),
-                String::new(),
-            ),
-        );
-        diffs_vec
-    }
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -281,7 +185,13 @@ pub struct PersonHistory {
 }
 impl PersonHistory {
     pub fn build(person: NewPerson) -> PersonHistory {
-        let diffmap = person.find_diffs();
+        let diffmap = EditInstance::edits_from_history(
+            person
+                .content
+                .iter()
+                .map(|file| file.get_text().clone())
+                .collect::<Vec<String>>(),
+        );
         let content = person.content;
         let final_text = content
             .iter()
