@@ -1,3 +1,4 @@
+pub mod text_edits;
 use core::panic;
 use csv;
 use rayon::{self, join};
@@ -12,6 +13,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+use text_edits::EditInstance;
 use undoc::docx::DocxParser;
 use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
 use walkdir::WalkDir;
@@ -144,80 +146,6 @@ impl FileInstance {
     }
     pub fn get_size(&self) -> &u64 {
         &self.filesize
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct EditInstance {
-    time: String,
-    change_wordcount: u32,
-    change_sentence_count: u32,
-    #[serde(skip_serializing)]
-    sentence_additions: String,
-    #[serde(skip_serializing)]
-    sentence_edits: String,
-    #[serde(skip_serializing)]
-    word_additions: String,
-    #[serde(skip_serializing)]
-    word_deletions: String,
-}
-impl EditInstance {
-    fn new(
-        timeperiod: String,
-        sentence_additions: String,
-        sentence_edits: String,
-        word_additions: String,
-        word_deletions: String,
-    ) -> EditInstance {
-        EditInstance {
-            time: timeperiod,
-            change_wordcount: sentence_additions.unicode_words().count() as u32,
-            change_sentence_count: sentence_additions.unicode_sentences().count() as u32,
-            sentence_additions,
-            sentence_edits,
-            word_additions,
-            word_deletions,
-        }
-    }
-    /// Output a vector containing the filenames of each types of data saved, such as sentence-level additions and edits.
-    // Update this function to include new save types if any new output text types are added. This will allow R to properly load whatever new data is being produced.
-    pub fn list_savetypes() -> Vec<String> {
-        vec![
-            "SentenceAdditions".to_string(),
-            "SentenceEdits".to_string(),
-            "WordAdditions".to_string(),
-            "WordDeletions".to_string(),
-        ]
-    }
-    pub fn get_edits(&self) -> &String {
-        &self.sentence_additions
-    }
-    pub fn get_timeperiod(&self) -> &String {
-        &self.time
-    }
-    fn save_to_file(path: &Path, filename: &str, content: &String) -> Result<(), io::Error> {
-        fs::create_dir_all(&path)?;
-        let mut text_file = File::create(path.join(filename))?;
-        text_file.write_all(&content.as_bytes())?;
-        text_file.flush()?;
-        Ok(())
-    }
-
-    pub fn write(&self, path: &Path) -> &String {
-        let time_path = path.join(&self.time);
-        Self::save_to_file(
-            &time_path,
-            "SentenceAdditions.txt",
-            &self.sentence_additions,
-        )
-        .expect("Failed to save data");
-        Self::save_to_file(&time_path, "SentenceEdits.txt", &self.sentence_edits)
-            .expect("Failed to save data");
-        Self::save_to_file(&time_path, "WordAdditions.txt", &self.word_additions)
-            .expect("Failed to save data");
-        Self::save_to_file(&time_path, "WordDeletions.txt", &self.word_deletions)
-            .expect("Failed to save data");
-        &self.time
     }
 }
 
