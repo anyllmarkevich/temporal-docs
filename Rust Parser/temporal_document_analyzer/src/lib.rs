@@ -72,11 +72,10 @@ impl DatabaseHistory {
     }
 
     pub fn save(&self, path: &Path) {
-        if path.exists() {
+        if !path.read_dir().unwrap().next().is_none() || !path.exists() {
             panic!("The ouput path provided already exists. Executuion has been halted to prevent overriding data.")
             // This is the wrong place for this check!!! Move it to the user-interfacing commands when possible
         }
-        //println!("{:?}", path.join("AWA.csv"));
         fs::create_dir_all(path).expect("Couldn't create file structure.");
         let mut summary_wtr = csv::Writer::from_path(path.join("PeopleSummary.csv"))
             .expect("Couldn't open saving path.");
@@ -104,7 +103,13 @@ impl DatabaseHistory {
                 ])
                 .expect("Writing issue.")
         });
-        people_data_paths_wtr.flush().unwrap()
+        people_data_paths_wtr.flush().unwrap();
+        let mut savetype_wtr =
+            csv::Writer::from_path(path.join("SaveType.csv")).expect("Could not open saving path.");
+        EditInstance::list_savetypes()
+            .iter()
+            .for_each(|x| savetype_wtr.write_record(&[x]).expect("Writing issue."));
+        savetype_wtr.flush().unwrap();
     }
 }
 
@@ -173,6 +178,16 @@ impl EditInstance {
             word_additions,
             word_deletions,
         }
+    }
+    /// Output a vector containing the filenames of each types of data saved, such as sentence-level additions and edits.
+    // Update this function to include new save types if any new output text types are added. This will allow R to properly load whatever new data is being produced.
+    pub fn list_savetypes() -> Vec<String> {
+        vec![
+            "SentenceAdditions".to_string(),
+            "SentenceEdits".to_string(),
+            "WordAdditions".to_string(),
+            "WordDeletions".to_string(),
+        ]
     }
     pub fn get_edits(&self) -> &String {
         &self.sentence_additions
