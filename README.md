@@ -7,10 +7,33 @@ Although this functionality is conceptually useful in many fields, our aim is to
 This program requires regular snapshots of student notebooks, formatted as Microsoft Word files. We recommend that educators assign specific notebooks to students through Google Drive or another similar file sharing platform, ensuring that the educator can easily download the notebooks periodically. Each student notebook should be uniquely named. The educator can then periodically save the notebooks into sequentially named folders for each time period. The Rust program provided in this repository can then easily extract text written, deleted, or edited during each time period, saving it into another folder that the accompanying R program can read. After calling a couple of functions in R, educators will have access to a wealth of information about the text written by students in their notebooks throughout the class.
 ## Using Temporal Documents
 ### Saving Source Documents
+Create a folder where you would like to store the snapshots of people's documents. Periodically create a subfolder and alphanumerically label it to indicate the sequential order of the snapshots. Download the latest version of the documents you wish to track of (note that Microsoft Word and downloaded Google Docs documents are supported as they use the same file format) and save them into this subfolder. Make sure to keep the names of each person's document identical across subfolders! Repeat the process of creating the folder and saving the latest version of the documents into the newest folder.
+The input directory to the program should be formatted as follows:
+```
+Data_Folder
+├── timeperiod_001
+│   ├── Alice_Doc_snapshot.docx
+│   └── Bob_Doc_snapshot.docx
+├── timeperiod_002
+│   ├── Alice_Doc_snapshot.docx
+│   └── Bob_Doc_snapshot.docx
+└── timeperiod_003
+    ├── Alice_Doc_snapshot.docx
+    └── Bob_Doc_snapshot.docx
+```
+Here are important formatting rules to keep in mind:
+- Snapshot folders must be alphanumerically arranged in chronological order.
+    - This means that numbers should be formatted as `001`, `002`, `003`, etc. This is critical because the program will correctly interpret `009` as coming before `010`, but will incorrectly place `10` before `9`, breaking the underlying edits algorithm.
+    - Dates should follow a Year-Month-Day pattern. `2012-12-31` will work great, but `December 31 2012`, `30-12-2012`, or `12-30-2012` may all cause issues.
+- All documents attributable to the same author should have the exact same unique filename. Otherwise, they will be counted as different people or data from multiple people will be merged together.
+- Currently, each person may only have one document listed in each time period.
 ### Using the Rust Crate
+Currently, it's necessary to install Rust and Cargo. Download the source code in this repository, build the project, and run this command: `cargo run -- "path/to/input_data" "path/to/where_you_wish_to_save_output"`. This will be a lot easier very soon!
 ### Reading Data in R
-Make sure to include a copy of the `DataParser.R` file in you R project. Load the file into your own R code using `source(DataParser.R)`. Simply input the output file path you set earlier into the two following functions, save the output, and access the data for your own analyses.
+Make sure to include a copy of the `DataParser.R` file in your R project. Load the file into your own R code using `source(DataParser.R)`. Simply input the output file path you set earlier into the two following functions, save the output into a variable, and access the data for your own analyses.
 - `get_temporal_doc_data(path)` returns a list of every person who wrote a document. Each list item contains a data table where rows are time periods (defined by the document snapshots downloaded by the user) and the columns are different types of text identified as edited since the preceding time period.
 - `get_final_doc_version(path)` returns a list of every person who wrote a document where each list item contains the latest downloaded version of their writing.
-### Examples
 ## Installation
+This program does not currently support Windows operating systems.
+### From Source
+Begin by installing [Rust](https://rust-lang.org/tools/install/) and [R](https://www.r-project.org). Download the source code from this repository. Open a console window in `Rust Parser/temporal_document_analyzer` and run compile the program using `cargo run` (see the "Using the Rust Crate" section).

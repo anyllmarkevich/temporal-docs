@@ -1,30 +1,26 @@
 pub mod text_edits;
-use core::{panic, time};
+use core::panic;
 use csv;
-use rayon::{self, join};
-use serde::de::Error;
+use rayon;
 use serde::Serialize;
-use similar::{self, Change, ChangeTag, DiffableStr, DiffableStrRef, TextDiff};
-use std::collections::HashMap;
-use std::fmt::format;
-use std::fs::File;
-use std::io::{self, Write};
 use std::{
-    fs,
+    collections::HashMap,
+    fs::{self, File},
+    io::Write,
     path::{Path, PathBuf},
 };
 use text_edits::*;
 use undoc::docx::DocxParser;
-use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
+use unicode_segmentation::UnicodeSegmentation;
 use walkdir::WalkDir;
 
-/// This struct captures and saves a complete record of the every document written by every person, along with a complete record of changes between time periods.
+/// Captures and saves a complete record of the every document written by every person in the database, along with a complete record of changes between time periods.
 /// # Example Usage
-/// ```
+/// ```no_run
 /// use std::path::{self, Path};
 /// use temporal_document_analyzer::{self, DatabaseHistory};
-/// let input_path = Path::new("~/users/example_user/data_folder/");
-/// let output_path = Path::new("~/users/example_user/save_folder/");
+/// let input_path = Path::new("examples/data_folder/");
+/// let output_path = Path::new("examples/save_folder/");
 /// let database = DatabaseHistory::build(input_path); // Create database and calculate edit history
 /// database.print_changelist(); // Print changes to the console
 /// database.save(output_path); // Save final text and edit history for every person into a directory, easily readable using accompanying R functions
@@ -33,15 +29,16 @@ pub struct DatabaseHistory {
     hash: HashMap<String, PersonHistory>,
 }
 impl DatabaseHistory {
+    /// Create a database containing a complete history of edits between document snapshots from multiple people. Needs a path pointing to directory with a properly specified structure within as input.
     pub fn build(path: &Path) -> DatabaseHistory {
         let hash = Self::hash_people(path);
-        DatabaseHistory { hash: hash }
+        DatabaseHistory { hash }
     }
-
+    /// Easily print a rudimentary history of word-level additions for debugging purposes
     pub fn print_changelist(&self) {
         self.hash.iter().for_each(|(_, x)| x.print_history());
     }
-
+    /// Traverse input database, extracting a complete list of people who's writing to track and the raw text data of each document snapshot. Then convert this data into a history of edits between snapshots.
     fn hash_people(path: &Path) -> HashMap<String, PersonHistory> {
         let mut people_hash: HashMap<String, NewPerson> = HashMap::new();
         WalkDir::new(path)
@@ -72,9 +69,9 @@ impl DatabaseHistory {
             .map(|(k, v)| (k, v.construct_history()))
             .collect()
     }
-
+    /// Save the entire database of edits between document snapshots written by multiple people to a new directory as a series of folders, text files, and CSV files. This structure can easily be read by the accompanying R program. The specified directory must be empty.
     pub fn save(&self, path: &Path) {
-        if !path.read_dir().unwrap().next().is_none() || !path.exists() {
+        if path.exists() && !path.read_dir().unwrap().next().is_none() {
             panic!("The ouput path provided already exists. Executuion has been halted to prevent overriding data.")
             // This is the wrong place for this check!!! Move it to the user-interfacing commands when possible
         }
@@ -115,6 +112,7 @@ impl DatabaseHistory {
     }
 }
 
+// Contains information about a single snapshot of a document, including the raw text data, the path were the data was found, and the original file size.
 #[derive(Debug, Clone, Serialize)]
 pub struct FileInstance {
     path: String,
@@ -123,7 +121,8 @@ pub struct FileInstance {
     text: String,
 }
 impl FileInstance {
-    fn build(path: String) -> FileInstance {
+    /// Save information on a new file containing a document snapshot of a person's writing.
+    pub fn build(path: String) -> FileInstance {
         FileInstance {
             path: path.clone(),
             time: Path::new(&path)
@@ -141,39 +140,58 @@ impl FileInstance {
                 .plain_text(),
         }
     }
+    /// Get the raw text contained in the file.
     pub fn get_text(&self) -> &String {
         &self.text
     }
+    /// Get the size of the file in bytes.
     pub fn get_size(&self) -> &u64 {
         &self.filesize
     }
+    /// Get the name of the enclosing folder, which should correspond to the time period after which this snapshot was taken if the database is formatted properly.
     pub fn get_time_period(&self) -> &String {
         &self.time
     }
 }
 
+/// Simply stores raw data about a specific person's writing before converting it into a time-series of edits (which is handled by the PersonHistory struct). This ensures that all data is correctly accessed before running computationally expensive comparisons between document versions.
+/// ```no_run
+///use temporal_document_analyzer::NewPerson;
+///use std::path::{self, Path};
+///fn main() {
+///    let path_time_1 = "examples/data_folder/timeperiod_1/".to_string();
+///    let path_time_2 = "examples/data_folder/timeperiod_2/".to_string();
+///    let mut bobs_writing = NewPerson::build("Bob\'s notes.docx".to_string(), path_time_1); // Initialize a data record for Bob, including the first snapshot of their writing.
+///    bobs_writing.add_path(path_time_2); // Add a additional writing from Bob.
+///    let bobs_writing_history = bobs_writing.construct_history(); // Convert these raw snapshots into a history of edits (see the PersonHistory struct)
+///}
+/// ```
 #[derive(Debug)]
-struct NewPerson {
+pub struct NewPerson {
     filename: String,
     content: Vec<FileInstance>,
 }
 
 impl NewPerson {
-    fn build(filename: String, path: String) -> NewPerson {
+    /// Identify a new person who's writing history should be inferred. Requires an initial snapshot of their writing.
+    pub fn build(filename: String, path: String) -> NewPerson {
         NewPerson {
-            filename: filename,
+            filename,
             content: vec![FileInstance::build(path)],
         }
     }
-    fn add_path(&mut self, path: String) {
+    /// Add additional writing snapshots to the data for a specific person.
+    pub fn add_path(&mut self, path: String) {
         self.content.push(FileInstance::build(path));
         self.content.sort_by_key(|s| s.path.clone());
     }
+    /// Convert the NewPerson struct to a PersonHistory struct, which will calculate sentence- and word-level changes between each snapshot.
     pub fn construct_history(self) -> PersonHistory {
         PersonHistory::build(self)
     }
 }
 
+/// Handles converting raw data about a single person's writing into a series of edits, storing this data, and allowing the API to access it in a variety of ways.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct PersonHistory {
     filename: String,
@@ -187,7 +205,8 @@ pub struct PersonHistory {
     final_text: String,
 }
 impl PersonHistory {
-    pub fn build(person: NewPerson) -> PersonHistory {
+    /// Converts a NewPerson struct into a PersonHistory struct by calculating differences between writing snapshots and saving a bunch of data on the writing of that person. This conversion is handled from the NewPerson struct from the API's perspective, even though it simply calls this function.
+    fn build(person: NewPerson) -> PersonHistory {
         let time_periods: Vec<String> = person
             .content
             .iter()
@@ -224,6 +243,7 @@ impl PersonHistory {
             final_text,
         }
     }
+    /// Very basic output of word-level additions to that console for debugging.
     pub fn print_history(&self) {
         println!("———————————————————————————");
         println!("Printing hisotry from filenames \"{}\".", self.filename);
@@ -235,6 +255,7 @@ impl PersonHistory {
             )
         });
     }
+    /// Save all the data about a person's writing and the edits they made at each timeperiod to a specific file path.
     pub fn write(&self, path: &Path) -> PathBuf {
         let my_path = path.join(&self.filename);
         fs::create_dir_all(&my_path).expect("Couldn't create file structure.");
@@ -254,6 +275,7 @@ impl PersonHistory {
         timeperiod_wtr.flush().unwrap();
         my_path
     }
+    /// Get the name used to identify a person in the database (the filename of their writing snapshots)
     pub fn get_name(&self) -> &String {
         &self.filename
     }
