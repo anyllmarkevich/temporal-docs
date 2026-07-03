@@ -1,4 +1,4 @@
-path <- "/Users/anyll/Documents/My files/  Topics/Work/Work Files/CU Boulder/Andy Martin/Evolutionary Biology/Refined Notebook Code/Outputs/Output Tests Generation 1/Test 2/"
+path <- "/Users/anyll/Documents/My files/  Topics/Work/Work Files/CU Boulder/Andy Martin/Evolutionary Biology/Refined Notebook Code/Outputs/Output Tests Generation 1/Test 4/"
 
 # Returns a List, with an entry for every person in the database. Each list entry is a data table containing each edit type at every time period for that person.
 # This function takes the output path given to the Rust program as input. In other words, input the path to the directory containing the formatted temporal data.
