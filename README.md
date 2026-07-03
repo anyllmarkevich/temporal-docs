@@ -36,4 +36,4 @@ Make sure to include a copy of the `DataParser.R` file in your R project. Load t
 ## Installation
 This program does not currently support Windows operating systems.
 ### From Source
-Begin by installing [Rust](https://rust-lang.org/tools/install/) and [R](https://www.r-project.org). Download the source code from this repository. Open a console window in `Rust Parser/temporal_document_analyzer` and run compile the program using `cargo run` (see the "Using the Rust Crate" section).
+Begin by installing [Rust](https://rust-lang.org/tools/install/) and [R](https://www.r-project.org). Download the source code from this repository. Open a console window in `Rust Parser/temporal_document_analyzer` and compile the program using `cargo run` (see the "Using the Rust Crate" section).
