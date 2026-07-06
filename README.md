@@ -3,6 +3,8 @@ This repository converts organized snapshots of Microsoft Word files from multip
 > **Note:** this program ***does not*** provide the detailed timestamp data logged by the "track changes" feature common among most word processing software. This program is intended as a coarse and easily managed data extraction tool, not a document history tracker.
 
 Although this functionality is conceptually useful in many fields, our aim is to aide educators, who are often faced with the challenge of understanding student educational journeys beyond the reductive metric of assignment letter grades. This repository can help educators and education researchers gain insights into what students are learning, the challenges they face, and the unique trajectories of every student by making temporal data about student notebooks readily accessible for analysis in R.
+
+This project relies on the [similar](https://github.com/mitsuhiko/similar) crate for identifying changes between documents and the [unicode_segmentation](https://github.com/unicode-rs/unicode-segmentation) for identifying word and sentence boundaries.
 ## Pedagogical Setup
 This program requires regular snapshots of student notebooks, formatted as Microsoft Word files. We recommend that educators assign specific notebooks to students through Google Drive or another similar file sharing platform, ensuring that the educator can easily download the notebooks periodically. Each student notebook should be uniquely named. The educator can then periodically save the notebooks into sequentially named folders for each time period. The Rust program provided in this repository can then easily extract text written, deleted, or edited during each time period, saving it into another folder that the accompanying R program can read. After calling a couple of functions in R, educators will have access to a wealth of information about the text written by students in their notebooks throughout the class.
 ## Using Temporal Documents
@@ -30,9 +32,21 @@ Here are important formatting rules to keep in mind:
 ### Using the Rust Crate
 Currently, it's necessary to install Rust and Cargo. Download the source code in this repository, build the project, and run this command: `cargo run -- "path/to/input_data" "path/to/where_you_wish_to_save_output"`. This will be a lot easier very soon!
 ### Reading Data in R
-Make sure to include a copy of the `DataParser.R` file in your R project. Load the file into your own R code using `source(DataParser.R)`. Simply input the output file path you set earlier into the two following functions, save the output into a variable, and access the data for your own analyses.
-- `get_temporal_doc_data(path)` returns a list of every person who wrote a document. Each list item contains a data table where rows are time periods (defined by the document snapshots downloaded by the user) and the columns are different types of text identified as edited since the preceding time period.
-- `get_final_doc_version(path)` returns a list of every person who wrote a document where each list item contains the latest downloaded version of their writing.
+Make sure to include a copy of the `DataParser.R` file in your R project. Load the file into your own R code using `source(DataParser.R)`. To load your data into the R program, run the `get_temporal_doc_data(path)` function, inputting the output path you set when running the Rust program. The resulting object can be accessed directly or using one of the functions that take an object as input.
+#### Importing Data
+`get_temporal_doc_data(path)` returns a list of every person who wrote a document, using a filepath to the output of the Rust program as input. Each list item contains a data table where rows are time periods (defined by the document snapshots downloaded by the user) and the columns are different types of data or metadata.
+
+The currently available data columns are:
+- `SentenceAdditions`: All Unicode sentences that contained newly written text since the last time period.
+- `SentenceEdits`: All Unicode sentences where text was added or deleted since the last time period.
+- `WordAdditions`: All newly written Unicode words since the last time period.
+- `WordDeletions`: All deleted Unicode words since the last time period.
+- `Text`: The current state of the entire document.
+#### Analyzing Data
+Although the list object created by `get_temporal_doc_data(path)` can be accessed directly for analysis, built-in functions can help quickly extract useful information form this data structure.
+
+The currently available functions are:
+- `get_final_doc_version(object)` returns a list of every person who wrote a document where each list item contains the latest downloaded version of their writing.
 ## Installation
 This program does not currently support Windows operating systems.
 ### From Source

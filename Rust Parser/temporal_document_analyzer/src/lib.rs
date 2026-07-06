@@ -255,15 +255,10 @@ impl PersonHistory {
             )
         });
     }
-    /// Save all the data about a person's writing and the edits they made at each timeperiod to a specific file path.
+    /// Save all the data about a person's writing and the edits they made at each time period to a specific filepath.
     pub fn write(&self, path: &Path) -> PathBuf {
         let my_path = path.join(&self.filename);
         fs::create_dir_all(&my_path).expect("Couldn't create file structure.");
-        let mut final_text_file =
-            File::create(my_path.join("FinalText.txt")).expect("Couldn't create a new file.");
-        final_text_file
-            .write_all(&self.final_text.as_bytes())
-            .expect("Could not write final text state.");
         let mut timeperiod_wtr =
             csv::Writer::from_path(my_path.join("timeperiod.csv")).expect("Failed to open path.");
         self.diffmap.iter().for_each(|(time, edit)| {

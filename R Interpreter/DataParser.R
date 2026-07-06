@@ -8,7 +8,7 @@ get_temporal_doc_data <- function(path) {
   people_change_data <- list()
   
   for (person in people_info[,1]) {
-    times <- read.csv(paste(path, "People/",person,"/timeperiod.csv", sep = ""), header = TRUE)
+    times <- read.csv(paste(path, "People/",person,"/timeperiod.csv", sep = ""), header = FALSE)
     #print(times)
     temp_data_frame <- data.frame(matrix(ncol = length(savetypes[,1]), nrow = 0))
     for (time in times[,1]) {
@@ -32,16 +32,13 @@ get_temporal_doc_data <- function(path) {
 }
 
 # Returns a List, with an entry for every person in the database. Each list entry is string containing the latest saved version of that person's writing.
-# This function takes the output path given to the Rust program as input. In other words, input the path to the directory containing the formatted temporal data.
-get_final_doc_version <- function(path) {
-  people_info <- read.csv(paste(path, "PeopleInfo.csv", sep = ""), header = FALSE)
-  people_final_text <- list()
-  
-  for (person in people_info[,1]) {
-    final_text_path <- paste(path, "People/",person,"/FinalText.txt", sep = "")
-    people_final_text[[length(people_final_text) + 1]] <- readChar(final_text_path, file.info(final_text_path)$size)
+# This function takes the list outputted by get_temporal_doc_data() as input.
+get_final_doc_version <- function(object) {
+  people_final_text <- c()
+  for (i in 1:length(object)) {
+    people_final_text[i] <- tail(unlist(object[[i]][["Text"]]), n=1)
   }
-  names(people_final_text) <- people_info[,1]
+  names(people_final_text) <- names(object)
   return(people_final_text)
 }
 
