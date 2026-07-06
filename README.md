@@ -4,7 +4,7 @@ This repository converts organized snapshots of Microsoft Word files from multip
 
 Although this functionality is conceptually useful in many fields, our aim is to aide educators, who are often faced with the challenge of understanding student educational journeys beyond the reductive metric of assignment letter grades. This repository can help educators and education researchers gain insights into what students are learning, the challenges they face, and the unique trajectories of every student by making temporal data about student notebooks readily accessible for analysis in R.
 
-This project relies on the [similar](https://github.com/mitsuhiko/similar) crate for identifying changes between documents and the [unicode_segmentation](https://github.com/unicode-rs/unicode-segmentation) for identifying word and sentence boundaries.
+This project relies on the [similar](https://github.com/mitsuhiko/similar) crate for identifying changes between documents and the [unicode_segmentation](https://github.com/unicode-rs/unicode-segmentation) crate for identifying word and sentence boundaries.
 ## Pedagogical Setup
 This program requires regular snapshots of student notebooks, formatted as Microsoft Word files. We recommend that educators assign specific notebooks to students through Google Drive or another similar file sharing platform, ensuring that the educator can easily download the notebooks periodically. Each student notebook should be uniquely named. The educator can then periodically save the notebooks into sequentially named folders for each time period. The Rust program provided in this repository can then easily extract text written, deleted, or edited during each time period, saving it into another folder that the accompanying R program can read. After calling a couple of functions in R, educators will have access to a wealth of information about the text written by students in their notebooks throughout the class.
 ## Using Temporal Documents
@@ -46,7 +46,7 @@ The currently available data columns are:
 Although the list object created by `get_temporal_doc_data(path)` can be accessed directly for analysis, built-in functions can help quickly extract useful information form this data structure.
 
 The currently available functions are:
-- `get_final_doc_version(object)` returns a list of every person who wrote a document where each list item contains the latest downloaded version of their writing.
+- `get_final_doc_version(object)` returns a vector of every person who wrote a document where each item contains the latest downloaded version of their writing.
 ## Installation
 This program does not currently support Windows operating systems.
 ### From Source
