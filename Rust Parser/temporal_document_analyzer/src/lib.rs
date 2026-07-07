@@ -3,6 +3,7 @@ use core::panic;
 use csv;
 use rayon::prelude::*;
 use serde::Serialize;
+use similar::DiffableStr;
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -26,47 +27,59 @@ use walkdir::WalkDir;
 /// database.save(output_path); // Save final text and edit history for every person into a directory, easily readable using accompanying R functions
 /// ```
 pub struct DatabaseHistory {
-    hash: HashMap<String, PersonHistory>,
+    data: Vec<PersonHistory>,
 }
 impl DatabaseHistory {
     /// Create a database containing a complete history of edits between document snapshots from multiple people. Needs a path pointing to directory with a properly specified structure within as input.
     pub fn build(path: &Path) -> DatabaseHistory {
-        let hash = Self::hash_people(path);
-        DatabaseHistory { hash }
+        let data = Self::hash_people(path);
+        DatabaseHistory { data }
     }
     /// Easily print a rudimentary history of word-level additions for debugging purposes
     pub fn print_changelist(&self) {
-        self.hash.iter().for_each(|(_, x)| x.print_history());
+        self.data.iter().for_each(|x| x.print_history());
     }
     /// Traverse input database, extracting a complete list of people who's writing to track and the raw text data of each document snapshot. Then convert this data into a history of edits between snapshots.
-    fn hash_people(path: &Path) -> HashMap<String, PersonHistory> {
-        let mut people_hash: HashMap<String, NewPerson> = HashMap::new();
-        WalkDir::new(path)
+    fn hash_people(path: &Path) -> Vec<PersonHistory> {
+        let people_hash: HashMap<String, Vec<String>> = WalkDir::new(path)
             .max_depth(2)
             .min_depth(2)
             .into_iter()
+            .par_bridge()
             .filter_map(|e| e.ok())
             .filter(|e| e.metadata().unwrap().is_file())
-            .for_each(|file| {
-                let filename = file
+            .map(|file| {
+                let name = file
                     .path()
                     .file_name()
                     .unwrap()
                     .to_string_lossy()
                     .into_owned();
-                people_hash
-                    .entry(filename.clone())
-                    .and_modify(|person| {
-                        person.add_path(file.path().to_string_lossy().into_owned())
-                    })
-                    .or_insert(NewPerson::build(
-                        filename,
-                        file.path().to_string_lossy().into_owned(),
-                    ));
-            });
+                let path = file.path().to_string_lossy().into_owned();
+                (name, path)
+            })
+            .fold(
+                || HashMap::new(),
+                |mut temp_map, (name, path)| {
+                    temp_map
+                        .entry(name)
+                        .or_insert_with(|| Vec::new())
+                        .push(path);
+                    temp_map
+                },
+            )
+            .reduce(
+                || HashMap::new(),
+                |mut map, new_map| {
+                    new_map.into_iter().for_each(|(name, paths)| {
+                        map.entry(name).or_insert_with(|| Vec::new()).extend(paths);
+                    });
+                    map
+                },
+            );
         people_hash
             .into_par_iter()
-            .map(|(k, v)| (k, v.construct_history()))
+            .map(|(name, paths)| NewPerson::new(name, paths).construct_history())
             .collect()
     }
     /// Save the entire database of edits between document snapshots written by multiple people to a new directory as a series of folders, text files, and CSV files. This structure can easily be read by the accompanying R program. The specified directory must be empty.
@@ -78,14 +91,14 @@ impl DatabaseHistory {
         fs::create_dir_all(path).expect("Couldn't create file structure.");
         let mut summary_wtr = csv::Writer::from_path(path.join("PeopleSummary.csv"))
             .expect("Couldn't open saving path.");
-        self.hash
+        self.data
             .iter()
-            .for_each(|(_, v)| summary_wtr.serialize(v).expect("Writing problem."));
+            .for_each(|v| summary_wtr.serialize(v).expect("Writing problem."));
         summary_wtr.flush().unwrap();
         let person_data_path = path.join("People");
         let mut people_data_paths_wtr = csv::Writer::from_path(path.join("PeopleInfo.csv"))
             .expect("Couldn't open saving path.");
-        self.hash.iter().for_each(|(_, person)| {
+        self.data.iter().for_each(|person| {
             // Both output a file containing summary statistics for a person and save the generated file path for that person to memory.
             let person_path = person.write(&person_data_path);
             // Save a CSV containing paths to people's data.
@@ -173,6 +186,15 @@ pub struct NewPerson {
 }
 
 impl NewPerson {
+    pub fn new(filename: String, paths: Vec<String>) -> NewPerson {
+        NewPerson {
+            filename,
+            content: paths
+                .iter()
+                .map(|path| FileInstance::build(path.to_string()))
+                .collect(),
+        }
+    }
     /// Identify a new person who's writing history should be inferred. Requires an initial snapshot of their writing.
     pub fn build(filename: String, path: String) -> NewPerson {
         NewPerson {
