@@ -1,7 +1,7 @@
 pub mod text_edits;
 use core::panic;
 use csv;
-use rayon;
+use rayon::prelude::*;
 use serde::Serialize;
 use std::{
     collections::HashMap,
@@ -65,7 +65,7 @@ impl DatabaseHistory {
                     ));
             });
         people_hash
-            .into_iter()
+            .into_par_iter()
             .map(|(k, v)| (k, v.construct_history()))
             .collect()
     }
