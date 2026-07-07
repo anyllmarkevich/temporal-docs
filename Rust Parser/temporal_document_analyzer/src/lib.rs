@@ -79,7 +79,7 @@ impl DatabaseHistory {
             );
         people_hash
             .into_par_iter()
-            .map(|(name, paths)| NewPerson::new(name, paths).construct_history())
+            .map(|(name, paths)| PersonHistory::build(name, paths))
             .collect()
     }
     /// Save the entire database of edits between document snapshots written by multiple people to a new directory as a series of folders, text files, and CSV files. This structure can easily be read by the accompanying R program. The specified directory must be empty.
@@ -141,15 +141,15 @@ impl FileInstance {
             time: Path::new(&path)
                 .components()
                 .nth_back(1)
-                .expect("Couldn't find folder name.")
+                .expect("Couldn't find folder name")
                 .as_os_str()
                 .to_string_lossy()
                 .to_string(),
             filesize: fs::metadata(&path).unwrap().len(),
             text: DocxParser::open(path)
-                .expect("Couldn't open a file.")
+                .expect("Couldn't open document in the Microsoft Word parser")
                 .parse()
-                .unwrap()
+                .expect("Could not parse Microsoft Word document")
                 .plain_text(),
         }
     }
@@ -167,90 +167,45 @@ impl FileInstance {
     }
 }
 
-/// Simply stores raw data about a specific person's writing before converting it into a time-series of edits (which is handled by the PersonHistory struct). This ensures that all data is correctly accessed before running computationally expensive comparisons between document versions.
-/// ```no_run
-///use temporal_document_analyzer::NewPerson;
-///use std::path::{self, Path};
-///fn main() {
-///    let path_time_1 = "examples/data_folder/timeperiod_1/".to_string();
-///    let path_time_2 = "examples/data_folder/timeperiod_2/".to_string();
-///    let mut bobs_writing = NewPerson::build("Bob\'s notes.docx".to_string(), path_time_1); // Initialize a data record for Bob, including the first snapshot of their writing.
-///    bobs_writing.add_path(path_time_2); // Add a additional writing from Bob.
-///    let bobs_writing_history = bobs_writing.construct_history(); // Convert these raw snapshots into a history of edits (see the PersonHistory struct)
-///}
-/// ```
-#[derive(Debug)]
-pub struct NewPerson {
+/// Handles converting raw data about a single person's writing into a series of edits, storing this data, and allowing the API to access it in a variety of ways.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PersonHistory {
     filename: String,
-    content: Vec<FileInstance>,
+    #[serde(skip_serializing)]
+    filesizes: Vec<u64>,
+    #[serde(skip_serializing)]
+    diffmap: Vec<(String, EditInstance)>,
 }
-
-impl NewPerson {
-    pub fn new(filename: String, paths: Vec<String>) -> NewPerson {
+impl PersonHistory {
+    /// Converts a NewPerson struct into a PersonHistory struct by calculating differences between writing snapshots and saving a bunch of data on the writing of that person. This conversion is handled from the NewPerson struct from the API's perspective, even though it simply calls this function.
+    pub fn build(filename: String, paths: Vec<String>) -> PersonHistory {
         let mut content: Vec<FileInstance> = paths
             .iter()
             .map(|path| FileInstance::build(path.to_string()))
             .collect::<Vec<FileInstance>>();
         content.sort_by_key(|file| file.get_time_period().to_owned());
-        NewPerson { filename, content }
-    }
-
-    /// Convert the NewPerson struct to a PersonHistory struct, which will calculate sentence- and word-level changes between each snapshot.
-    pub fn construct_history(self) -> PersonHistory {
-        PersonHistory::build(self)
-    }
-}
-
-/// Handles converting raw data about a single person's writing into a series of edits, storing this data, and allowing the API to access it in a variety of ways.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct PersonHistory {
-    filename: String,
-    filesize: u64,
-    wordcount: u32,
-    #[serde(skip_serializing)]
-    content: Vec<FileInstance>,
-    #[serde(skip_serializing)]
-    diffmap: Vec<(String, EditInstance)>,
-    #[serde(skip_serializing)]
-    final_text: String,
-}
-impl PersonHistory {
-    /// Converts a NewPerson struct into a PersonHistory struct by calculating differences between writing snapshots and saving a bunch of data on the writing of that person. This conversion is handled from the NewPerson struct from the API's perspective, even though it simply calls this function.
-    fn build(person: NewPerson) -> PersonHistory {
-        let time_periods: Vec<String> = person
-            .content
+        let filesizes: Vec<u64> = content
+            .iter()
+            .map(|file| file.get_size().to_owned())
+            .collect();
+        let time_periods: Vec<String> = content
             .iter()
             .map(|file| file.get_time_period().clone())
             .collect();
         let diffmap: Vec<(String, EditInstance)> = EditInstance::edits_from_history(
-            person
-                .content
-                .iter()
-                .map(|file| file.get_text().clone())
+            content
+                .into_iter()
+                .map(|file| file.text)
                 .collect::<Vec<String>>(),
         )
         .into_iter()
         .zip(time_periods)
         .map(|(edits, time)| (time, edits))
         .collect();
-        let content = person.content;
-        let final_text = content
-            .iter()
-            .max_by_key(|x| x.time.clone())
-            .expect("Couldn't find max time period.")
-            .get_text()
-            .to_string();
         PersonHistory {
-            filename: person.filename,
-            filesize: *content
-                .iter()
-                .max_by_key(|x| x.time.clone())
-                .expect("Couldn't find max time period.")
-                .get_size(),
-            wordcount: final_text.unicode_words().count() as u32,
-            content,
+            filename,
+            filesizes,
             diffmap,
-            final_text,
         }
     }
     /// Very basic output of word-level additions to that console for debugging.
