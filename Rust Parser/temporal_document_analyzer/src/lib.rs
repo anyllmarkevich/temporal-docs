@@ -32,7 +32,7 @@ pub struct DatabaseHistory {
 impl DatabaseHistory {
     /// Create a database containing a complete history of edits between document snapshots from multiple people. Needs a path pointing to directory with a properly specified structure within as input.
     pub fn build(path: &Path) -> DatabaseHistory {
-        let data = Self::hash_people(path);
+        let data = Self::extract_data(path);
         DatabaseHistory { data }
     }
     /// Easily print a rudimentary history of word-level additions for debugging purposes
@@ -40,7 +40,7 @@ impl DatabaseHistory {
         self.data.iter().for_each(|x| x.print_history());
     }
     /// Traverse input database, extracting a complete list of people who's writing to track and the raw text data of each document snapshot. Then convert this data into a history of edits between snapshots.
-    fn hash_people(path: &Path) -> Vec<PersonHistory> {
+    fn extract_data(path: &Path) -> Vec<PersonHistory> {
         let people_hash: HashMap<String, Vec<String>> = WalkDir::new(path)
             .max_depth(2)
             .min_depth(2)
@@ -187,26 +187,14 @@ pub struct NewPerson {
 
 impl NewPerson {
     pub fn new(filename: String, paths: Vec<String>) -> NewPerson {
-        NewPerson {
-            filename,
-            content: paths
-                .iter()
-                .map(|path| FileInstance::build(path.to_string()))
-                .collect(),
-        }
+        let mut content: Vec<FileInstance> = paths
+            .iter()
+            .map(|path| FileInstance::build(path.to_string()))
+            .collect::<Vec<FileInstance>>();
+        content.sort_by_key(|file| file.get_time_period().to_owned());
+        NewPerson { filename, content }
     }
-    /// Identify a new person who's writing history should be inferred. Requires an initial snapshot of their writing.
-    pub fn build(filename: String, path: String) -> NewPerson {
-        NewPerson {
-            filename,
-            content: vec![FileInstance::build(path)],
-        }
-    }
-    /// Add additional writing snapshots to the data for a specific person.
-    pub fn add_path(&mut self, path: String) {
-        self.content.push(FileInstance::build(path));
-        self.content.sort_by_key(|s| s.path.clone());
-    }
+
     /// Convert the NewPerson struct to a PersonHistory struct, which will calculate sentence- and word-level changes between each snapshot.
     pub fn construct_history(self) -> PersonHistory {
         PersonHistory::build(self)
