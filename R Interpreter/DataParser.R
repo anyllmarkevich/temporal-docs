@@ -1,6 +1,9 @@
 # Returns a List, with an entry for every person in the database. Each list entry is a data table containing each edit type at every time period for that person.
 # This function takes the output path given to the Rust program as input. In other words, input the path to the directory containing the formatted temporal data.
 get_temporal_doc_data <- function(path) {
+  if (substr(path, nchar(path), nchar(path)) != "/") {
+    path <- paste(path, "/", sep = "")
+  }
   people_info <- read.csv(paste(path, "PeopleInfo.csv", sep = ""), header = FALSE)
   savetypes <- read.csv(paste(path, "SaveType.csv", sep = ""), header = FALSE)
   people_change_data <- list()
