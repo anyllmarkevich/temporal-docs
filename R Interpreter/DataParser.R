@@ -6,8 +6,7 @@ get_temporal_doc_data <- function(path) {
   people_change_data <- list()
   
   for (person in people_info[,1]) {
-    times <- read.csv(paste(path, "People/",person,"/timeperiod.csv", sep = ""), header = FALSE)
-    #print(times)
+    times <- read.csv(paste(path, "People/",person,"/timeperiod.csv", sep = ""))
     temp_data_frame <- data.frame(matrix(ncol = length(savetypes[,1]), nrow = 0))
     for (time in times[,1]) {
       row <- c()
@@ -23,6 +22,7 @@ get_temporal_doc_data <- function(path) {
     }
     colnames(temp_data_frame) <- savetypes[,1]
     rownames(temp_data_frame) <- times[,1]
+    temp_data_frame <- cbind(temp_data_frame, times[,2:length(colnames(times))])
     people_change_data[[length(people_change_data) + 1]] <- temp_data_frame
   }
   names(people_change_data) <- people_info[,1]
