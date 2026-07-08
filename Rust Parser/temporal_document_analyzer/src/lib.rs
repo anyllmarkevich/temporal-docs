@@ -91,12 +91,6 @@ impl DatabaseHistory {
             // This is the wrong place for this check!!! Move it to the user-interfacing commands when possible
         }
         fs::create_dir_all(path).expect("Couldn't create file structure.");
-        let mut summary_wtr = csv::Writer::from_path(path.join("PeopleSummary.csv"))
-            .expect("Couldn't open saving path.");
-        self.data
-            .iter()
-            .for_each(|v| summary_wtr.serialize(v).expect("Writing problem."));
-        summary_wtr.flush().unwrap();
         let person_data_path = path.join("People");
         let mut people_data_paths_wtr = csv::Writer::from_path(path.join("PeopleInfo.csv"))
             .expect("Couldn't open saving path.");
@@ -129,7 +123,7 @@ impl DatabaseHistory {
 
 // Contains information about a single snapshot of a document, including the raw text data, the path were the data was found, and the original file size.
 #[derive(Debug, Clone, Serialize)]
-pub struct FileInstance {
+struct FileInstance {
     path: String,
     time: String,
     filesize: u64,
@@ -137,7 +131,7 @@ pub struct FileInstance {
 }
 impl FileInstance {
     /// Save information on a new file containing a document snapshot of a person's writing.
-    pub fn build(path: String) -> FileInstance {
+    fn build(path: String) -> FileInstance {
         FileInstance {
             path: path.clone(),
             time: Path::new(&path)
@@ -156,29 +150,31 @@ impl FileInstance {
         }
     }
     /// Get the raw text contained in the file.
-    pub fn get_text(&self) -> &String {
+    fn get_text(&self) -> &String {
         &self.text
     }
     /// Get the size of the file in bytes.
-    pub fn get_size(&self) -> &u64 {
+    fn get_size(&self) -> &u64 {
         &self.filesize
     }
     /// Get the name of the enclosing folder, which should correspond to the time period after which this snapshot was taken if the database is formatted properly.
-    pub fn get_time_period(&self) -> &String {
+    fn get_time_period(&self) -> &String {
         &self.time
     }
 }
 
-#[derive(Debug, Clone)]
-struct TimePeriod {
+#[derive(Debug, Clone, Serialize)]
+pub struct TimePeriod {
     time: String,
     filesize: u64,
     word_count: usize,
     sentence_count: usize,
+    #[serde(skip)]
     edits: EditInstance,
 }
 
 impl TimePeriod {
+    /// This function really only exists because EditInstance requires a vector of all the document versions to build a history of edits, while each TimePeriod instance should contain information on only one version at a time. This whole function simply unwraps all the data in each FileInstance so that the data can be used sequentially by EditInstnace, before chopping it back up into TimePeriods. The only reason it is so complicated is to avoid copying the text data, which may be very large depending on the files the user is working with. Yes, each TimePeriod could take multiple files as input to construct the EditInstances one by one, but I would rather keep all that functionality hidden in EditInstance.
     fn build_from_history(files: Vec<FileInstance>) -> Vec<TimePeriod> {
         let (times, filesizes, word_counts, sentence_counts, text): (
             Vec<String>,
@@ -198,7 +194,7 @@ impl TimePeriod {
                 )
             })
             .multiunzip();
-        let edits: Vec<EditInstance> = EditInstance::edits_from_history(text);
+        let edits: Vec<EditInstance> = EditInstance::edits_from_history(text); // This line is the only reason this function exists.
         izip!(times, filesizes, word_counts, sentence_counts, edits)
             .into_iter()
             .map(
@@ -256,7 +252,7 @@ impl PersonHistory {
             csv::Writer::from_path(my_path.join("timeperiod.csv")).expect("Failed to open path.");
         self.data.iter().for_each(|time_period| {
             timeperiod_wtr
-                .write_record(&[time_period.time.clone()])
+                .serialize(time_period)
                 .expect("Failed to serialize edit.");
             time_period
                 .edits
