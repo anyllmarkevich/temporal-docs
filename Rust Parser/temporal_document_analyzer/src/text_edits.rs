@@ -124,7 +124,7 @@ impl EditInstance {
         Self::save_to_file(&time_path, "Text.txt", &self.text).expect("Failed to save data")
     }
     /// Return various types of edits or current text, specifying what kind of text is returned using an enum.
-    pub fn get_text(&self, of_type: SaveType) -> &String {
+    pub fn get_text(&self, of_type: &SaveType) -> &String {
         match of_type {
             SaveType::SentenceAdditions => &self.sentence_additions,
             SaveType::SentenceEdits => &self.sentence_edits,
@@ -136,7 +136,7 @@ impl EditInstance {
 }
 
 // Update this enum to include new save types if any new output text types are added. This will allow R to properly load whatever new data is being produced.
-#[derive(Debug, Display, EnumIter)]
+#[derive(Debug, Display, EnumIter, Clone)]
 pub enum SaveType {
     #[strum(serialize = "SentenceAdditions")]
     SentenceAdditions,

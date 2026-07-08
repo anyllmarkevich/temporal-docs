@@ -1,6 +1,6 @@
 use clap::Parser;
 use std::path::PathBuf;
-use temporal_document_analyzer::*;
+use temporal_document_analyzer::{text_edits::SaveType, *};
 
 fn main() {
     let args = Cli::parse();
@@ -9,7 +9,7 @@ fn main() {
         args.input_path, args.output_path
     );
     let database = DatabaseHistory::build(&args.input_path);
-    database.print_changelist();
+    database.print_changelist(&SaveType::WordAdditions);
     database.save(&args.output_path);
 }
 

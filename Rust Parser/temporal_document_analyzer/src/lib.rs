@@ -1,6 +1,7 @@
 pub mod text_edits;
 use core::panic;
 use csv;
+use itertools::{izip, MultiUnzip};
 use rayon::prelude::*;
 use serde::Serialize;
 use similar::DiffableStr;
@@ -8,6 +9,7 @@ use std::{
     collections::HashMap,
     fs::{self, File},
     io::Write,
+    iter::zip,
     path::{Path, PathBuf},
 };
 use text_edits::*;
@@ -36,8 +38,8 @@ impl DatabaseHistory {
         DatabaseHistory { data }
     }
     /// Easily print a rudimentary history of word-level additions for debugging purposes
-    pub fn print_changelist(&self) {
-        self.data.iter().for_each(|x| x.print_history());
+    pub fn print_changelist(&self, save_type: &SaveType) {
+        self.data.iter().for_each(|x| x.print_history(save_type));
     }
     /// Traverse input database, extracting a complete list of people who's writing to track and the raw text data of each document snapshot. Then convert this data into a history of edits between snapshots.
     fn extract_data(path: &Path) -> Vec<PersonHistory> {
@@ -167,14 +169,56 @@ impl FileInstance {
     }
 }
 
+#[derive(Debug, Clone)]
+struct TimePeriod {
+    time: String,
+    filesize: u64,
+    word_count: usize,
+    sentence_count: usize,
+    edits: EditInstance,
+}
+
+impl TimePeriod {
+    fn build_from_history(files: Vec<FileInstance>) -> Vec<TimePeriod> {
+        let (times, filesizes, word_counts, sentence_counts, text): (
+            Vec<String>,
+            Vec<u64>,
+            Vec<usize>,
+            Vec<usize>,
+            Vec<String>,
+        ) = files
+            .into_iter()
+            .map(|f| {
+                (
+                    f.get_time_period().clone(),
+                    f.get_size().clone(),
+                    f.get_text().unicode_words().count(),
+                    f.get_text().unicode_sentences().count(),
+                    f.text,
+                )
+            })
+            .multiunzip();
+        let edits: Vec<EditInstance> = EditInstance::edits_from_history(text);
+        izip!(times, filesizes, word_counts, sentence_counts, edits)
+            .into_iter()
+            .map(
+                |(time, filesize, word_count, sentence_count, edits)| TimePeriod {
+                    time,
+                    filesize,
+                    word_count,
+                    sentence_count,
+                    edits,
+                },
+            )
+            .collect()
+    }
+}
+
 /// Handles converting raw data about a single person's writing into a series of edits, storing this data, and allowing the API to access it in a variety of ways.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone)]
 pub struct PersonHistory {
     filename: String,
-    #[serde(skip_serializing)]
-    filesizes: Vec<u64>,
-    #[serde(skip_serializing)]
-    diffmap: Vec<(String, EditInstance)>,
+    data: Vec<TimePeriod>,
 }
 impl PersonHistory {
     /// Converts a NewPerson struct into a PersonHistory struct by calculating differences between writing snapshots and saving a bunch of data on the writing of that person. This conversion is handled from the NewPerson struct from the API's perspective, even though it simply calls this function.
@@ -184,39 +228,23 @@ impl PersonHistory {
             .map(|path| FileInstance::build(path.to_string()))
             .collect::<Vec<FileInstance>>();
         content.sort_by_key(|file| file.get_time_period().to_owned());
-        let filesizes: Vec<u64> = content
-            .iter()
-            .map(|file| file.get_size().to_owned())
-            .collect();
-        let time_periods: Vec<String> = content
-            .iter()
-            .map(|file| file.get_time_period().clone())
-            .collect();
-        let diffmap: Vec<(String, EditInstance)> = EditInstance::edits_from_history(
-            content
-                .into_iter()
-                .map(|file| file.text)
-                .collect::<Vec<String>>(),
-        )
-        .into_iter()
-        .zip(time_periods)
-        .map(|(edits, time)| (time, edits))
-        .collect();
         PersonHistory {
             filename,
-            filesizes,
-            diffmap,
+            data: TimePeriod::build_from_history(content),
         }
     }
+    fn iterate_edits(&self) -> impl Iterator<Item = &EditInstance> {
+        self.data.iter().map(|t| &t.edits)
+    }
     /// Very basic output of word-level additions to that console for debugging.
-    pub fn print_history(&self) {
+    pub fn print_history(&self, edit_type: &SaveType) {
         println!("———————————————————————————");
         println!("Printing hisotry from filenames \"{}\".", self.filename);
-        self.diffmap.iter().for_each(|(time, edits)| {
+        self.data.iter().for_each(|time_period| {
             println!(
                 "The following words were written during timeperiod {}: \"{}\"",
-                time,
-                edits.get_text(SaveType::WordAdditions)
+                time_period.time,
+                time_period.edits.get_text(&edit_type)
             )
         });
     }
@@ -226,11 +254,13 @@ impl PersonHistory {
         fs::create_dir_all(&my_path).expect("Couldn't create file structure.");
         let mut timeperiod_wtr =
             csv::Writer::from_path(my_path.join("timeperiod.csv")).expect("Failed to open path.");
-        self.diffmap.iter().for_each(|(time, edit)| {
+        self.data.iter().for_each(|time_period| {
             timeperiod_wtr
-                .write_record(&[time])
+                .write_record(&[time_period.time.clone()])
                 .expect("Failed to serialize edit.");
-            edit.write(&my_path.join("Times"), time.to_string());
+            time_period
+                .edits
+                .write(&my_path.join("Times"), time_period.time.to_string());
         });
         timeperiod_wtr.flush().unwrap();
         my_path
