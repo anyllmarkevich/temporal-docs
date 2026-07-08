@@ -42,6 +42,9 @@ The currently available data columns are:
 - `WordAdditions`: All newly written Unicode words since the last time period.
 - `WordDeletions`: All deleted Unicode words since the last time period.
 - `Text`: The current state of the entire document.
+- `filesize`: The size of this original document snapshot in bytes (includes images and other data not considered by this program).
+- `word_count`: The number of Unicode words in this document snapshot.
+- `sentence_count`: The number of Unicode sentences in this document snapshot.
 #### Analyzing Data
 Although the list object created by `get_temporal_doc_data(path)` can be accessed directly for analysis, built-in functions can help quickly extract useful information form this data structure.
 
