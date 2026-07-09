@@ -23,7 +23,7 @@ use walkdir::WalkDir;
 /// let input_path = Path::new("examples/data_folder/");
 /// let output_path = Path::new("examples/save_folder/");
 /// let database = DatabaseHistory::build(input_path); // Create database and calculate edit history
-/// database.print_changelist(&SaveType::SentenceAdditions); // Print changes to the console
+/// database.print_changelist(&SaveType::SentenceAdditions); // Print the everyone's history of sentences that were added or added to between snapshots.
 /// database.save(output_path); // Save final text and edit history for every person into a directory, easily readable using accompanying R functions
 /// ```
 pub struct DatabaseHistory {
