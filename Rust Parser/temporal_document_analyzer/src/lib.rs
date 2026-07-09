@@ -4,12 +4,9 @@ use csv;
 use itertools::{izip, MultiUnzip};
 use rayon::prelude::*;
 use serde::Serialize;
-use similar::DiffableStr;
 use std::{
     collections::HashMap,
-    fs::{self, File},
-    io::Write,
-    iter::zip,
+    fs,
     path::{Path, PathBuf},
 };
 use text_edits::*;
@@ -37,7 +34,7 @@ impl DatabaseHistory {
         let data = Self::extract_data(path);
         DatabaseHistory { data }
     }
-    /// Easily print a rudimentary history of word-level additions for debugging purposes
+    /// Easily print a history of a specific type of edit or text data, as determined by the SaveType input.
     pub fn print_changelist(&self, save_type: &SaveType) {
         self.data.iter().for_each(|x| x.print_history(save_type));
     }
@@ -95,7 +92,7 @@ impl DatabaseHistory {
         let mut people_data_paths_wtr = csv::Writer::from_path(path.join("PeopleInfo.csv"))
             .expect("Couldn't open saving path.");
         self.data.iter().for_each(|person| {
-            // Both output a file containing summary statistics for a person and save the generated file path for that person to memory.
+            // Both output a file containing summary statistics for a person and save the generated filepath for that person to memory.
             let person_path = person.write(&person_data_path);
             // Save a CSV containing paths to people's data.
             people_data_paths_wtr
@@ -163,6 +160,7 @@ impl FileInstance {
     }
 }
 
+/// Saves processed data about a single person/document for a time period (as determined by the saved snapshots). This includes information on changes since the last time period and information on the file representing the current time period (file size, word counts, etc.).
 #[derive(Debug, Clone, Serialize)]
 pub struct TimePeriod {
     time: String,
@@ -174,6 +172,30 @@ pub struct TimePeriod {
 }
 
 impl TimePeriod {
+    /// Get the name of the time period, which will typically be the name of the directory enclosing the document representing this time period.
+    pub fn get_time_period(&self) -> &String {
+        &self.time
+    }
+    /// Get the file size of the associated document in bytes.
+    pub fn get_file_size(&self) -> &u64 {
+        &self.filesize
+    }
+    /// Get the number of Unicode words in the associated document.
+    pub fn get_word_count(&self) -> &usize {
+        &self.word_count
+    }
+    /// Get the number of Unicode sentences in the associated document.
+    pub fn get_sentence_count(&self) -> &usize {
+        &self.sentence_count
+    }
+    /// Borrow text data and edits since the last snapshot (packaged in an EditInstance struct). If ownership of this data is required and this TimePeriod instance is no longer needed, the extract_data() function is preferable.
+    pub fn get_edits(&self) -> &EditInstance {
+        &self.edits
+    }
+    /// Get ownership of text data and edits since the last snapshot (packaged in an EditInstance struct), thereby destroying the TimePeriod instance. This function may be favored other get_edits() if it helps avoid copying data.
+    pub fn extract_edits(self) -> EditInstance {
+        self.edits
+    }
     /// This function really only exists because EditInstance requires a vector of all the document versions to build a history of edits, while each TimePeriod instance should contain information on only one version at a time. This whole function simply unwraps all the data in each FileInstance so that the data can be used sequentially by EditInstnace, before chopping it back up into TimePeriods. The only reason it is so complicated is to avoid copying the text data, which may be very large depending on the files the user is working with. Yes, each TimePeriod could take multiple files as input to construct the EditInstances one by one, but I would rather keep all that functionality hidden in EditInstance.
     fn build_from_history(files: Vec<FileInstance>) -> Vec<TimePeriod> {
         let (times, filesizes, word_counts, sentence_counts, text): (
@@ -217,7 +239,7 @@ pub struct PersonHistory {
     data: Vec<TimePeriod>,
 }
 impl PersonHistory {
-    /// Converts a NewPerson struct into a PersonHistory struct by calculating differences between writing snapshots and saving a bunch of data on the writing of that person. This conversion is handled from the NewPerson struct from the API's perspective, even though it simply calls this function.
+    /// Creates a NewPerson struct, calculating differences between writing snapshots and storing a bunch of data on the writing of that person. Requires the filename of the person's documents and a vector containing paths to every document the person wrote.
     pub fn build(filename: String, paths: Vec<String>) -> PersonHistory {
         let mut content: Vec<FileInstance> = paths
             .iter()
@@ -229,10 +251,7 @@ impl PersonHistory {
             data: TimePeriod::build_from_history(content),
         }
     }
-    fn iterate_edits(&self) -> impl Iterator<Item = &EditInstance> {
-        self.data.iter().map(|t| &t.edits)
-    }
-    /// Very basic output of word-level additions to that console for debugging.
+    /// Prints a specific kind of data for the entire history of a person's writing, as determined by the SaveType input. For instance, this function can print all word-level additions, of the fulltext of each snapshot.
     pub fn print_history(&self, edit_type: &SaveType) {
         println!("———————————————————————————");
         println!("Printing hisotry from filenames \"{}\".", self.filename);
@@ -264,5 +283,13 @@ impl PersonHistory {
     /// Get the name used to identify a person in the database (the filename of their writing snapshots)
     pub fn get_name(&self) -> &String {
         &self.filename
+    }
+    /// Access the text data about a persons writing, including edits between documents. The extract_data() function may be more efficient if ownership is required.
+    pub fn get_data(&self) -> &Vec<TimePeriod> {
+        &self.data
+    }
+    /// Consumes PersonHistory object to return ownership to text data about a person's writing, including edits between documents. This function may be more efficient than get_data() if it allows not copying the data and the PersonHistory instance is no longer needed.
+    pub fn extract_data(self) -> Vec<TimePeriod> {
+        self.data
     }
 }

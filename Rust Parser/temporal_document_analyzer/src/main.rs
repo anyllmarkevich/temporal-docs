@@ -1,6 +1,6 @@
 use clap::Parser;
 use std::path::PathBuf;
-use temporal_document_analyzer::{text_edits::SaveType, *};
+use temporal_docs::{text_edits::SaveType, *};
 
 fn main() {
     let args = Cli::parse();

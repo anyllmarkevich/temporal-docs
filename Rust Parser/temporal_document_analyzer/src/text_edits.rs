@@ -1,21 +1,14 @@
 //! Tools to convert a set of strings representing sequential temporal snapshots of an evolving document or text into information on the sequential changes between each string.
 
-use core::panic;
-use csv;
-use rayon::{self, join};
-use serde::de::Error;
-use serde::Serialize;
-use similar::{self, Change, ChangeTag, DiffableStr, DiffableStrRef, TextDiff};
+use similar::{self, ChangeTag, DiffableStr, TextDiff};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Write};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, mem, path::Path};
 use strum::Display;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use unicode_segmentation::{UWordBounds, UnicodeSegmentation};
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Stores a string and the differences between it and another temporally preceding string, including sentence-level additions and edits and word-level additions and deletions.Data can be extracted as strings or saved to files within a specified directory.
 #[derive(Debug, Clone)]
@@ -132,6 +125,26 @@ impl EditInstance {
             SaveType::WordDeletions => &self.word_deletions,
             SaveType::Text => &self.text,
         }
+    }
+    /// Like get_text(), returns various types of edits or current text, specifying what kind of text is returned using an enum. However, this function is designed to give ownership of the data in order to avoid cloning large amounts of data, and thus will destroy parts of the contents of this instance.
+    fn take_text(&mut self, of_type: &SaveType) -> String {
+        match of_type {
+            SaveType::SentenceAdditions => mem::take(&mut self.sentence_additions),
+            SaveType::SentenceEdits => mem::take(&mut self.sentence_edits),
+            SaveType::WordAdditions => mem::take(&mut self.word_additions),
+            SaveType::WordDeletions => mem::take(&mut self.word_deletions),
+            SaveType::Text => mem::take(&mut self.text),
+        }
+    }
+    /// Consumes instance and returns all the data contained within as a hashmap with minimal performance overhead by avoiding cloning data. The keys are the type of data, and the values are the text data.
+    pub fn extract_all_edits(mut self) -> HashMap<String, String> {
+        SaveType::iter().map(|x| (x.to_string(), x)).fold(
+            HashMap::new(),
+            |mut map, (name, savetype)| {
+                map.insert(name, Self::take_text(&mut self, &savetype));
+                map
+            },
+        )
     }
 }
 
