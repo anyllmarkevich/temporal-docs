@@ -9,8 +9,9 @@ fn main() {
         args.input_path, args.output_path
     );
     let database = DatabaseHistory::build(&args.input_path);
-    database.print_changelist(&SaveType::WordAdditions);
+    //database.print_changelist(&SaveType::WordAdditions);
     database.save(&args.output_path);
+    println!("Done!");
 }
 
 #[derive(Parser)]

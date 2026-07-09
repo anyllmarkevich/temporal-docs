@@ -1,6 +1,7 @@
 pub mod text_edits;
 use core::panic;
 use csv;
+use indicatif::{ParallelProgressIterator, ProgressIterator};
 use itertools::{izip, MultiUnzip};
 use rayon::prelude::*;
 use serde::Serialize;
@@ -40,6 +41,7 @@ impl DatabaseHistory {
     }
     /// Traverse input database, extracting a complete list of people who's writing to track and the raw text data of each document snapshot. Then convert this data into a history of edits between snapshots.
     fn extract_data(path: &Path) -> Vec<PersonHistory> {
+        println!("Locating files...");
         let people_hash: HashMap<String, Vec<String>> = WalkDir::new(path)
             .max_depth(2)
             .min_depth(2)
@@ -76,13 +78,17 @@ impl DatabaseHistory {
                     map
                 },
             );
+        let progress_len = people_hash.len() as u64;
+        println!("Converting files to temporal data...");
         people_hash
             .into_par_iter()
+            .progress_count(progress_len)
             .map(|(name, paths)| PersonHistory::build(name, paths))
             .collect()
     }
     /// Save the entire database of edits between document snapshots written by multiple people to a new directory as a series of folders, text files, and CSV files. This structure can easily be read by the accompanying R program. The specified directory must be empty.
     pub fn save(&self, path: &Path) {
+        println!("Saving data to files...");
         if path.exists() && !path.read_dir().unwrap().next().is_none() {
             panic!("The ouput path provided already exists. Executuion has been halted to prevent overriding data.")
             // This is the wrong place for this check!!! Move it to the user-interfacing commands when possible
@@ -91,23 +97,27 @@ impl DatabaseHistory {
         let person_data_path = path.join("People");
         let mut people_data_paths_wtr = csv::Writer::from_path(path.join("PeopleInfo.csv"))
             .expect("Couldn't open saving path.");
-        self.data.iter().for_each(|person| {
-            // Both output a file containing summary statistics for a person and save the generated filepath for that person to memory.
-            let person_path = person.write(&person_data_path);
-            // Save a CSV containing paths to people's data.
-            people_data_paths_wtr
-                .write_record(&[
-                    person.get_name(),
-                    &person_path
-                        .components()
-                        .skip(path.components().count())
-                        .collect::<PathBuf>()
-                        .into_os_string()
-                        .into_string()
-                        .unwrap(),
-                ])
-                .expect("Writing issue.")
-        });
+        let progress_len = self.data.len() as u64;
+        self.data
+            .iter()
+            .progress_count(progress_len)
+            .for_each(|person| {
+                // Both output a file containing summary statistics for a person and save the generated filepath for that person to memory.
+                let person_path = person.write(&person_data_path);
+                // Save a CSV containing paths to people's data.
+                people_data_paths_wtr
+                    .write_record(&[
+                        person.get_name(),
+                        &person_path
+                            .components()
+                            .skip(path.components().count())
+                            .collect::<PathBuf>()
+                            .into_os_string()
+                            .into_string()
+                            .unwrap(),
+                    ])
+                    .expect("Writing issue.")
+            });
         people_data_paths_wtr.flush().unwrap();
         let mut savetype_wtr =
             csv::Writer::from_path(path.join("SaveType.csv")).expect("Could not open saving path.");
