@@ -196,7 +196,7 @@ impl TimePeriod {
     pub fn extract_edits(self) -> EditInstance {
         self.edits
     }
-    /// This function really only exists because EditInstance requires a vector of all the document versions to build a history of edits, while each TimePeriod instance should contain information on only one version at a time. This whole function simply unwraps all the data in each FileInstance so that the data can be used sequentially by EditInstnace, before chopping it back up into TimePeriods. The only reason it is so complicated is to avoid copying the text data, which may be very large depending on the files the user is working with. Yes, each TimePeriod could take multiple files as input to construct the EditInstances one by one, but I would rather keep all that functionality hidden in EditInstance.
+    /// This function really only exists because EditInstance requires a vector of all the document versions to build a history of edits, while each TimePeriod instance should contain information on only one version at a time. This whole function simply unwraps all the data in each FileInstance so that the data can be used sequentially by EditInstance, before chopping it back up into TimePeriods. The only reason it is so complicated is to avoid copying the text data, which may be very large depending on the files the user is working with. Yes, each TimePeriod could take multiple files as input to construct the EditInstances one by one, but I would rather keep all that functionality hidden in EditInstance.
     fn build_from_history(files: Vec<FileInstance>) -> Vec<TimePeriod> {
         let (times, filesizes, word_counts, sentence_counts, text): (
             Vec<String>,
