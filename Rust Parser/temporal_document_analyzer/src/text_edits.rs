@@ -1,6 +1,6 @@
 //! Tools to convert a set of strings representing sequential temporal snapshots of an evolving document or text into information on the sequential changes between each string.
 
-use similar::{self, ChangeTag, DiffableStr, TextDiff};
+use similar::{self, ChangeTag, TextDiff};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Write};
@@ -125,6 +125,15 @@ impl EditInstance {
             SaveType::WordDeletions => mem::take(&mut self.word_deletions),
             SaveType::Text => mem::take(&mut self.text),
         }
+    }
+    pub fn get_all_edits(&self) -> HashMap<String, &String> {
+        SaveType::iter().map(|x| (x.to_string(), x)).fold(
+            HashMap::new(),
+            |mut map, (name, savetype)| {
+                map.insert(name, Self::get_text(&self, &savetype));
+                map
+            },
+        )
     }
     /// Consumes instance and returns all the data contained within as a hashmap with minimal performance overhead by avoiding cloning data. The keys are the type of data, and the values are the text data.
     pub fn extract_all_edits(mut self) -> HashMap<String, String> {

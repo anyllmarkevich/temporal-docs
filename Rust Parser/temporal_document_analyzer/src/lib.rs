@@ -7,7 +7,8 @@ use rayon::prelude::*;
 use serde::Serialize;
 use std::{
     collections::HashMap,
-    fs,
+    fs::{self, File},
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 use text_edits::*;
@@ -109,6 +110,7 @@ impl DatabaseHistory {
                     .write_record(&[
                         person.get_name(),
                         &person_path
+                            .expect("Something went wrong while writing.")
                             .components()
                             .skip(path.components().count())
                             .collect::<PathBuf>()
@@ -274,21 +276,29 @@ impl PersonHistory {
         });
     }
     /// Save all the data about a person's writing and the edits they made at each time period to a specific filepath.
-    pub fn write(&self, path: &Path) -> PathBuf {
+    pub fn write(&self, path: &Path) -> Result<PathBuf, io::Error> {
         let my_path = path.join(&self.filename);
-        fs::create_dir_all(&my_path).expect("Couldn't create file structure.");
-        let mut timeperiod_wtr =
-            csv::Writer::from_path(my_path.join("timeperiod.csv")).expect("Failed to open path.");
-        self.data.iter().for_each(|time_period| {
-            timeperiod_wtr
-                .serialize(time_period)
-                .expect("Failed to serialize edit.");
+        fs::create_dir_all(&my_path)?;
+        let mut timeperiod_wtr = csv::Writer::from_path(my_path.join("timeperiod.csv"))?;
+        self.data.iter().try_for_each(|time_period| {
+            timeperiod_wtr.serialize(time_period);
+            let time_period_path = &my_path.join("Times").join(time_period.time.to_string());
+            fs::create_dir_all(&time_period_path)?;
             time_period
                 .edits
-                .write(&my_path.join("Times"), time_period.time.to_string());
+                .get_all_edits()
+                .iter()
+                .try_for_each(|(edit_type, text)| {
+                    let mut text_file =
+                        File::create(time_period_path.join(format!("{}.txt", edit_type)))?;
+                    text_file.write_all(&text.as_bytes())?;
+                    text_file.flush()?;
+                    Ok::<(), io::Error>(())
+                });
+            Ok::<(), io::Error>(())
         });
-        timeperiod_wtr.flush().unwrap();
-        my_path
+        timeperiod_wtr.flush()?;
+        Ok(my_path)
     }
     /// Get the name used to identify a person in the database (the filename of their writing snapshots)
     pub fn get_name(&self) -> &String {
