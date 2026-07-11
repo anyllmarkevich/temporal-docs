@@ -2,9 +2,7 @@
 
 use similar::{self, ChangeTag, TextDiff};
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{self, Write};
-use std::{fs, mem, path::Path};
+use std::mem;
 use strum::Display;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
