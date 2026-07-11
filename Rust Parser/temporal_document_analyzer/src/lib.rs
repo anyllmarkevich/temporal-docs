@@ -275,27 +275,43 @@ impl PersonHistory {
             )
         });
     }
+
+    fn write_edit_type(
+        time_period_path: &Path,
+        edit_type: &String,
+        text: &String,
+    ) -> Result<(), io::Error> {
+        let mut text_file = File::create(time_period_path.join(format!("{}.txt", edit_type)))?;
+        text_file.write_all(&text.as_bytes())?;
+        text_file.flush()?;
+        Ok(())
+    }
+
+    fn write_time_period(
+        time_period: &TimePeriod,
+        path: &Path,
+        time_period_writer: &mut csv::Writer<File>,
+    ) -> Result<(), io::Error> {
+        let _ = time_period_writer.serialize(time_period);
+        let time_period_path = &path.join("Times").join(time_period.time.to_string());
+        fs::create_dir_all(&time_period_path)?;
+        let _ = time_period
+            .edits
+            .get_all_edits()
+            .iter()
+            .try_for_each(|(edit_type, text)| {
+                Self::write_edit_type(time_period_path, edit_type, text)
+            });
+        Ok(())
+    }
+
     /// Save all the data about a person's writing and the edits they made at each time period to a specific filepath.
     pub fn write(&self, path: &Path) -> Result<PathBuf, io::Error> {
         let my_path = path.join(&self.filename);
         fs::create_dir_all(&my_path)?;
         let mut timeperiod_wtr = csv::Writer::from_path(my_path.join("timeperiod.csv"))?;
-        self.data.iter().try_for_each(|time_period| {
-            timeperiod_wtr.serialize(time_period);
-            let time_period_path = &my_path.join("Times").join(time_period.time.to_string());
-            fs::create_dir_all(&time_period_path)?;
-            time_period
-                .edits
-                .get_all_edits()
-                .iter()
-                .try_for_each(|(edit_type, text)| {
-                    let mut text_file =
-                        File::create(time_period_path.join(format!("{}.txt", edit_type)))?;
-                    text_file.write_all(&text.as_bytes())?;
-                    text_file.flush()?;
-                    Ok::<(), io::Error>(())
-                });
-            Ok::<(), io::Error>(())
+        let _ = self.data.iter().try_for_each(|time_period| {
+            Self::write_time_period(time_period, &my_path, &mut timeperiod_wtr)
         });
         timeperiod_wtr.flush()?;
         Ok(my_path)

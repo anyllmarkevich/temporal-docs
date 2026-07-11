@@ -81,31 +81,7 @@ impl EditInstance {
             .collect::<Vec<String>>()
             .join(" ")
     }
-    /// Save a text to an appropriately named file.
-    fn save_to_file(path: &Path, filename: &str, content: &String) -> Result<(), io::Error> {
-        fs::create_dir_all(&path)?;
-        let mut text_file = File::create(path.join(filename))?;
-        text_file.write_all(&content.as_bytes())?;
-        text_file.flush()?;
-        Ok(())
-    }
-    /// Save all different edit types to separate text file at a specific path.
-    pub fn write(&self, path: &Path, timeperiod_name: String) {
-        let time_path = path.join(timeperiod_name);
-        Self::save_to_file(
-            &time_path,
-            "SentenceAdditions.txt",
-            &self.sentence_additions,
-        )
-        .expect("Failed to save data");
-        Self::save_to_file(&time_path, "SentenceEdits.txt", &self.sentence_edits)
-            .expect("Failed to save data");
-        Self::save_to_file(&time_path, "WordAdditions.txt", &self.word_additions)
-            .expect("Failed to save data");
-        Self::save_to_file(&time_path, "WordDeletions.txt", &self.word_deletions)
-            .expect("Failed to save data");
-        Self::save_to_file(&time_path, "Text.txt", &self.text).expect("Failed to save data")
-    }
+
     /// Return various types of edits or current text, specifying what kind of text is returned using an enum.
     pub fn get_text(&self, of_type: &SaveType) -> &String {
         match of_type {
