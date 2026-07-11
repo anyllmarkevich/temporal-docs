@@ -275,7 +275,7 @@ impl PersonHistory {
             )
         });
     }
-
+    /// Saves all the information about a single kind of edit to a text file, taking the path, the name of the kind of edit, and the text data as input.
     fn write_edit_type(
         time_period_path: &Path,
         edit_type: &String,
@@ -286,15 +286,18 @@ impl PersonHistory {
         text_file.flush()?;
         Ok(())
     }
-
+    /// Saves an entire TimePeriod to text and CSV files. Takes a TimePeriod, a path, and a CSV writer instance for the enclosing person as input.
     fn write_time_period(
         time_period: &TimePeriod,
         path: &Path,
         time_period_writer: &mut csv::Writer<File>,
     ) -> Result<(), io::Error> {
+        // Use CSV writer instance to save general information about the time period.
         let _ = time_period_writer.serialize(time_period);
+        // Set up the paths to use for the information on edits during this time period, and create the directory.
         let time_period_path = &path.join("Times").join(time_period.time.to_string());
         fs::create_dir_all(&time_period_path)?;
+        // Save all the data on edits inside the directory created for this purpose by extracting text from the enclosed EditInstance and writing that text.
         let _ = time_period
             .edits
             .get_all_edits()
