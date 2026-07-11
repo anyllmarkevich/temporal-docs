@@ -23,22 +23,12 @@ impl EditInstance {
     /// Calculate and store data on numerous types of edits between two different snapshots of a document.
     pub fn edit_from_text_comparison(old: &String, current: &String) -> EditInstance {
         let sentence_diffs: TextDiff<'_, '_, str> = TextDiff::from_slices(
-            &old.unicode_sentences()
-                .map(|x| x.as_str().unwrap().trim())
-                .collect::<Vec<&str>>(),
-            &current
-                .unicode_sentences()
-                .map(|x| x.as_str().unwrap().trim())
-                .collect::<Vec<&str>>(),
+            &old.unicode_sentences().collect::<Vec<&str>>(),
+            &current.unicode_sentences().collect::<Vec<&str>>(),
         );
         let word_diffs: TextDiff<'_, '_, str> = TextDiff::from_slices(
-            &old.unicode_words()
-                .map(|x| x.as_str().unwrap().trim())
-                .collect::<Vec<&str>>(),
-            &current
-                .unicode_words()
-                .map(|x| x.as_str().unwrap().trim())
-                .collect::<Vec<&str>>(),
+            &old.unicode_words().collect::<Vec<&str>>(),
+            &current.unicode_words().collect::<Vec<&str>>(),
         );
         EditInstance {
             sentence_additions: Self::tag_to_string(&sentence_diffs, ChangeTag::Insert),
