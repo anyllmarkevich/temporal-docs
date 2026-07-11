@@ -1,14 +1,16 @@
 pub mod text_edits;
+use anyhow::{Context, Result};
 use core::panic;
 use csv;
 use indicatif::{ParallelProgressIterator, ProgressIterator};
 use itertools::{izip, MultiUnzip};
 use rayon::prelude::*;
 use serde::Serialize;
+use similar::DiffableStr;
 use std::{
     collections::HashMap,
     fs::{self, File},
-    io::{self, Write},
+    io::Write,
     path::{Path, PathBuf},
 };
 use text_edits::*;
@@ -276,14 +278,29 @@ impl PersonHistory {
         });
     }
     /// Saves all the information about a single kind of edit to a text file, taking the path, the name of the kind of edit, and the text data as input.
-    fn write_edit_type(
-        time_period_path: &Path,
-        edit_type: &String,
-        text: &String,
-    ) -> Result<(), io::Error> {
-        let mut text_file = File::create(time_period_path.join(format!("{}.txt", edit_type)))?;
-        text_file.write_all(&text.as_bytes())?;
-        text_file.flush()?;
+    fn write_edit_type(time_period_path: &Path, edit_type: &String, text: &String) -> Result<()> {
+        let mut text_file = File::create(time_period_path.join(format!("{}.txt", edit_type)))
+            .with_context(|| {
+                format!(
+                    "Could not create \"{}.txt\" file at the following path: {}",
+                    edit_type.to_string_lossy(),
+                    time_period_path.to_string_lossy()
+                )
+            })?;
+        text_file.write_all(&text.as_bytes()).with_context(|| {
+            format!(
+                "Could not write data to \"{}.txt\" file at the following path: {}",
+                edit_type.to_string_lossy(),
+                time_period_path.to_string_lossy()
+            )
+        })?;
+        text_file.flush().with_context(|| {
+            format!(
+                "Could not flush data to \"{}.txt\" file at the following path: {}",
+                edit_type.to_string_lossy(),
+                time_period_path.to_string_lossy()
+            )
+        })?;
         Ok(())
     }
     /// Saves an entire TimePeriod to text and CSV files. Takes a TimePeriod, a path, and a CSV writer instance for the enclosing person as input.
@@ -291,12 +308,17 @@ impl PersonHistory {
         time_period: &TimePeriod,
         path: &Path,
         time_period_writer: &mut csv::Writer<File>,
-    ) -> Result<(), io::Error> {
+    ) -> Result<()> {
         // Use CSV writer instance to save general information about the time period.
         let _ = time_period_writer.serialize(time_period);
         // Set up the paths to use for the information on edits during this time period, and create the directory.
         let time_period_path = &path.join("Times").join(time_period.time.to_string());
-        fs::create_dir_all(&time_period_path)?;
+        fs::create_dir_all(&time_period_path).with_context(|| {
+            format!(
+                "Could not create necessary directories to make the following path valid: {}",
+                time_period_path.to_string_lossy()
+            )
+        })?;
         // Save all the data on edits inside the directory created for this purpose by extracting text from the enclosed EditInstance and writing that text.
         let _ = time_period
             .edits
@@ -309,14 +331,30 @@ impl PersonHistory {
     }
 
     /// Save all the data about a person's writing and the edits they made at each time period to a specific filepath.
-    pub fn write(&self, path: &Path) -> Result<PathBuf, io::Error> {
+    pub fn write(&self, path: &Path) -> Result<PathBuf> {
         let my_path = path.join(&self.filename);
-        fs::create_dir_all(&my_path)?;
-        let mut timeperiod_wtr = csv::Writer::from_path(my_path.join("timeperiod.csv"))?;
+        fs::create_dir_all(&my_path).with_context(|| {
+            format!(
+                "Could not create necessary directories to make the following path valid: {}",
+                my_path.to_string_lossy()
+            )
+        })?;
+        let mut timeperiod_wtr = csv::Writer::from_path(my_path.join("timeperiod.csv"))
+            .with_context(|| {
+                format!(
+                    "Could not create \"timeperiod.csv\" file at the following path: {}",
+                    my_path.to_string_lossy(),
+                )
+            })?;
         let _ = self.data.iter().try_for_each(|time_period| {
             Self::write_time_period(time_period, &my_path, &mut timeperiod_wtr)
         });
-        timeperiod_wtr.flush()?;
+        let _ = timeperiod_wtr.flush().with_context(|| {
+            format!(
+                "Could not flush new file \"timeperiod.csv\" at the following path: {}",
+                my_path.to_string_lossy()
+            )
+        });
         Ok(my_path)
     }
     /// Get the name used to identify a person in the database (the filename of their writing snapshots)
