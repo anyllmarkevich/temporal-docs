@@ -161,9 +161,9 @@ impl FileInstance {
             filesize: fs::metadata(&path).unwrap().len(),
             text: DocxParser::open(&path)
                 .with_context(|| {
-                    format!("Could not open file at path: {}.\nPlease ensure all documents in this directory are Microsoft Word files (.docx)", path.to_string_lossy())
+                    format!("Could not open file at path: {}.\nPlease ensure all documents in this directory are Microsoft Word files (.docx file extension)", path.to_string_lossy())
                 })?
-                .parse().with_context(||format!("Could not parse file found at {}.\nPlease ensure all documents in this directory are uncorrupted Microsoft Word files (docx)", path.to_string_lossy()))?
+                .parse().with_context(||format!("Could not parse file found at {}.\nPlease ensure all documents in this directory are uncorrupted Microsoft Word files.", path.to_string_lossy()))?
                 .plain_text(),
         })
     }
