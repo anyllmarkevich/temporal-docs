@@ -1,5 +1,6 @@
 //! Tools to convert a set of strings representing sequential temporal snapshots of an evolving document or text into information on the sequential changes between each string.
 
+use itertools::Itertools;
 use similar::{self, ChangeTag, TextDiff};
 use std::collections::HashMap;
 use std::mem;
@@ -39,9 +40,9 @@ impl EditInstance {
     /// Create and save data on numerous types of edits from a single document snapshot. Although no novel data can be extracted as there is no point of comparison, this function is useful for formatting the initial state of a document in the same structure as future calculated edits. The entire text is assumed to be a novel addition without any deletions.
     pub fn edit_from_text_snapshot(snapshot: &String) -> EditInstance {
         EditInstance {
-            sentence_additions: snapshot.clone(),
-            sentence_edits: snapshot.clone(),
-            word_additions: snapshot.clone(),
+            sentence_additions: snapshot.unicode_sentences().map(|s| s.trim()).join(" "),
+            sentence_edits: snapshot.unicode_sentences().map(|s| s.trim()).join(" "),
+            word_additions: snapshot.unicode_words().map(|s| s.trim()).join(" "),
             word_deletions: String::new(),
             text: snapshot.to_string(),
         }
@@ -63,7 +64,7 @@ impl EditInstance {
     fn edit_to_string<T: similar::DiffableStr + ToString + ?Sized>(diff: &TextDiff<T>) -> String {
         diff.iter_all_changes()
             .filter(|change| change.tag() == ChangeTag::Delete || change.tag() == ChangeTag::Insert)
-            .map(|change: similar::Change<_>| change.value().to_string())
+            .map(|change: similar::Change<_>| change.value().to_string().trim().to_string())
             .collect::<Vec<String>>()
             .join(" ")
     }
@@ -75,7 +76,7 @@ impl EditInstance {
     ) -> String {
         diff.iter_all_changes()
             .filter(|change| change.tag() == tag)
-            .map(|change: similar::Change<_>| change.value().to_string())
+            .map(|change: similar::Change<_>| change.value().to_string().trim().to_string())
             .collect::<Vec<String>>()
             .join(" ")
     }
