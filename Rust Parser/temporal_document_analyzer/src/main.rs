@@ -14,7 +14,7 @@ fn main() -> Result<()> {
     );
     let database = DatabaseHistory::build(&args.input_path)?;
     //database.print_changelist(&SaveType::WordAdditions);
-    database.save(&args.output_path);
+    database.save(&args.output_path)?;
     println!("Done!");
     Ok(())
 }

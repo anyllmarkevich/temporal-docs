@@ -108,33 +108,55 @@ impl DatabaseHistory {
             .collect::<Result<Vec<PersonHistory>>>()
     }
     /// Save the entire database of edits between document snapshots written by multiple people to a new directory as a series of folders, text files, and CSV files. This structure can easily be read by the accompanying R program. The specified directory must be empty.
-    pub fn save(&self, path: &Path) {
+    pub fn save(&self, path: &Path) -> Result<()> {
         println!("Saving data to files...");
-        fs::create_dir_all(path).expect("Couldn't create file structure.");
+        let _ = fs::create_dir_all(path).with_context(|| {
+            format!(
+                "Could not create necessary directories to make the following path valid: {}",
+                path.to_string_lossy()
+            )
+        })?;
         let person_data_path = path.join("People");
         let mut people_data_paths_wtr = csv::Writer::from_path(path.join("PeopleInfo.csv"))
-            .expect("Couldn't open saving path.");
+            .with_context(|| {
+                format!(
+                    "Could not create \"PeopleInfo.csv\" file at the following path: {}",
+                    path.to_string_lossy(),
+                )
+            })?;
         let progress_len = self.data.len() as u64;
-        self.data
+        let _ = self
+            .data
             .iter()
             .progress_count(progress_len)
-            .for_each(|person| {
+            .try_for_each(|person| {
                 // Both output a file containing summary statistics for a person and save the generated filepath for that person to memory.
-                let person_path = person.write(&person_data_path);
+                let person_path = person.write(&person_data_path).with_context(|| {
+                    format!(
+                        "Failed to save data about the person using the filename {}",
+                        person.get_name()
+                    )
+                })?;
                 // Save a CSV containing paths to people's data.
                 people_data_paths_wtr
                     .write_record(&[
                         person.get_name(),
                         &person_path
-                            .expect("Something went wrong while writing.")
                             .components()
                             .skip(path.components().count())
                             .collect::<PathBuf>()
                             .into_os_string()
                             .into_string()
-                            .unwrap(),
+                            .expect("Unknown failure in converting a file path to a string."),
                     ])
-                    .expect("Writing issue.")
+                    .with_context(|| {
+                        format!(
+                        "Failed to save data about the person using the filename {} to the path {}",
+                        person.get_name(),
+                        person_path.to_string_lossy()
+                    )
+                    })?;
+                Ok::<(), anyhow::Error>(())
             });
         people_data_paths_wtr.flush().unwrap();
         let mut savetype_wtr =
@@ -143,6 +165,7 @@ impl DatabaseHistory {
             .iter()
             .for_each(|x| savetype_wtr.write_record(&[x]).expect("Writing issue."));
         savetype_wtr.flush().unwrap();
+        Ok(())
     }
     /// Return a vector of the names of all the time periods this data structure contains.
     pub fn get_time_periods(&self) -> &Vec<String> {
