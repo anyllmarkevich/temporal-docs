@@ -1,3 +1,4 @@
+mod error;
 pub mod text_edits;
 use anyhow::{Context, Result};
 use core::panic;
@@ -44,6 +45,8 @@ impl DatabaseHistory {
             .into_iter()
             .filter_map(|e| e.ok())
             .collect();
+        let file_structure = error::check_file_tree(file_structure)?; // Ensure that the file tree is roughly formatted correctly.
+
         // Get the names of all time periods.
         let time_periods: Vec<String> = file_structure
             .iter()
