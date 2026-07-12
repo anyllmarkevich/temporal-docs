@@ -9,7 +9,6 @@ use serde::Serialize;
 use similar::DiffableStr;
 use std::{
     collections::HashMap,
-    fmt::format,
     fs::{self, File},
     io::Write,
     path::{Path, PathBuf},

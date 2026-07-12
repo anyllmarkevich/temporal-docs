@@ -1,6 +1,5 @@
 //! Tools to convert a set of strings representing sequential temporal snapshots of an evolving document or text into information on the sequential changes between each string.
 
-use anyhow::Result;
 use similar::{self, ChangeTag, TextDiff};
 use std::collections::HashMap;
 use std::mem;
