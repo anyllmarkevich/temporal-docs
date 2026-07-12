@@ -1,7 +1,6 @@
 mod error;
 pub mod text_edits;
 use anyhow::{Context, Result};
-use core::panic;
 use csv;
 use ignore::{DirEntry, WalkBuilder};
 use indicatif::{ParallelProgressIterator, ProgressIterator};
@@ -18,7 +17,6 @@ use std::{
 use text_edits::*;
 use undoc::docx::DocxParser;
 use unicode_segmentation::UnicodeSegmentation;
-//use walkdir::{DirEntry, WalkDir};
 
 /// Captures and saves a complete record of the every document written by every person in the database, along with a complete record of changes between time periods.
 /// # Example Usage
