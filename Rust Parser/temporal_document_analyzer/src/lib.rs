@@ -16,7 +16,7 @@ use std::{
 use text_edits::*;
 use undoc::docx::DocxParser;
 use unicode_segmentation::UnicodeSegmentation;
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 
 /// Captures and saves a complete record of the every document written by every person in the database, along with a complete record of changes between time periods.
 /// # Example Usage
@@ -31,27 +31,45 @@ use walkdir::WalkDir;
 /// ```
 pub struct DatabaseHistory {
     data: Vec<PersonHistory>,
+    time_periods: Vec<String>,
 }
 impl DatabaseHistory {
     /// Create a database containing a complete history of edits between document snapshots from multiple people. Needs a path pointing to directory with a properly specified structure within as input.
     pub fn build(path: &Path) -> Result<DatabaseHistory> {
-        let data = Self::extract_data(path)?;
-        Ok(DatabaseHistory { data })
+        println!("Locating time period directories...");
+        // Get data on files and folders on the input dataset.
+        let file_structure: Vec<DirEntry> = WalkDir::new(path)
+            .min_depth(1)
+            .max_depth(2)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .collect();
+        // Get the names of all time periods.
+        let time_periods: Vec<String> = file_structure
+            .iter()
+            .filter(|e| e.depth() == 1 && e.file_type().is_dir())
+            .map(|dir| {
+                dir.path()
+                    .file_name()
+                    .expect("")
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        // Pass info on all files and folders to this function to get actual data on people's writing.
+        let data = Self::extract_data(file_structure)?;
+        Ok(DatabaseHistory { data, time_periods })
     }
     /// Easily print a history of a specific type of edit or text data, as determined by the SaveType input.
     pub fn print_changelist(&self, save_type: &SaveType) {
         self.data.iter().for_each(|x| x.print_history(save_type));
     }
     /// Traverse input database, extracting a complete list of people who's writing to track and the raw text data of each document snapshot. Then convert this data into a history of edits between snapshots.
-    fn extract_data(path: &Path) -> Result<Vec<PersonHistory>> {
+    fn extract_data(files: Vec<DirEntry>) -> Result<Vec<PersonHistory>> {
         println!("Locating files...");
-        let people_hash: HashMap<String, Vec<String>> = WalkDir::new(path)
-            .max_depth(2)
-            .min_depth(2)
-            .into_iter()
-            .par_bridge()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().is_file())
+        let people_hash: HashMap<String, Vec<String>> = files
+            .into_par_iter()
+            .filter(|e| e.depth() == 2 && e.file_type().is_file())
             .map(|file| {
                 let name = file
                     .path()
@@ -129,6 +147,18 @@ impl DatabaseHistory {
             .iter()
             .for_each(|x| savetype_wtr.write_record(&[x]).expect("Writing issue."));
         savetype_wtr.flush().unwrap();
+    }
+    /// Return a vector of the names of all the time periods this data structure contains.
+    pub fn get_time_periods(&self) -> &Vec<String> {
+        &self.time_periods
+    }
+    /// Return a vector all the data on each person in this data structure. The take_data() function may be preferable for performance if the DatabaseHistory instance is no longer needed but ownership of the data is required.
+    pub fn get_data(&self) -> &Vec<PersonHistory> {
+        &self.data
+    }
+    /// Consume this data structure to get ownership of all the data on each person in the dataset. This function may be preferable to get_data() if ownership of the data is required, the DatabaseHistory instance is no longer needed, and the performance cost of cloning the data is unacceptable.
+    pub fn take_data(self) -> Vec<PersonHistory> {
+        self.data
     }
 }
 
