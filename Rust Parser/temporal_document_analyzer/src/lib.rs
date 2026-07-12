@@ -110,10 +110,6 @@ impl DatabaseHistory {
     /// Save the entire database of edits between document snapshots written by multiple people to a new directory as a series of folders, text files, and CSV files. This structure can easily be read by the accompanying R program. The specified directory must be empty.
     pub fn save(&self, path: &Path) {
         println!("Saving data to files...");
-        if path.exists() && !path.read_dir().unwrap().next().is_none() {
-            panic!("The ouput path provided already exists. Executuion has been halted to prevent overriding data.")
-            // This is the wrong place for this check!!! Move it to the user-interfacing commands when possible
-        }
         fs::create_dir_all(path).expect("Couldn't create file structure.");
         let person_data_path = path.join("People");
         let mut people_data_paths_wtr = csv::Writer::from_path(path.join("PeopleInfo.csv"))
