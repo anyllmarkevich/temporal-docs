@@ -9,6 +9,7 @@ use serde::Serialize;
 use similar::DiffableStr;
 use std::{
     collections::HashMap,
+    fmt::format,
     fs::{self, File},
     io::Write,
     path::{Path, PathBuf},
@@ -34,16 +35,16 @@ pub struct DatabaseHistory {
 }
 impl DatabaseHistory {
     /// Create a database containing a complete history of edits between document snapshots from multiple people. Needs a path pointing to directory with a properly specified structure within as input.
-    pub fn build(path: &Path) -> DatabaseHistory {
-        let data = Self::extract_data(path);
-        DatabaseHistory { data }
+    pub fn build(path: &Path) -> Result<DatabaseHistory> {
+        let data = Self::extract_data(path)?;
+        Ok(DatabaseHistory { data })
     }
     /// Easily print a history of a specific type of edit or text data, as determined by the SaveType input.
     pub fn print_changelist(&self, save_type: &SaveType) {
         self.data.iter().for_each(|x| x.print_history(save_type));
     }
     /// Traverse input database, extracting a complete list of people who's writing to track and the raw text data of each document snapshot. Then convert this data into a history of edits between snapshots.
-    fn extract_data(path: &Path) -> Vec<PersonHistory> {
+    fn extract_data(path: &Path) -> Result<Vec<PersonHistory>> {
         println!("Locating files...");
         let people_hash: HashMap<String, Vec<String>> = WalkDir::new(path)
             .max_depth(2)
@@ -51,12 +52,12 @@ impl DatabaseHistory {
             .into_iter()
             .par_bridge()
             .filter_map(|e| e.ok())
-            .filter(|e| e.metadata().unwrap().is_file())
+            .filter(|e| e.file_type().is_file())
             .map(|file| {
                 let name = file
                     .path()
                     .file_name()
-                    .unwrap()
+                    .expect("Should never fail. Failed to read a filename")
                     .to_string_lossy()
                     .into_owned();
                 let path = file.path().to_string_lossy().into_owned();
@@ -87,7 +88,7 @@ impl DatabaseHistory {
             .into_par_iter()
             .progress_count(progress_len)
             .map(|(name, paths)| PersonHistory::build(name, paths))
-            .collect()
+            .collect::<Result<Vec<PersonHistory>>>()
     }
     /// Save the entire database of edits between document snapshots written by multiple people to a new directory as a series of folders, text files, and CSV files. This structure can easily be read by the accompanying R program. The specified directory must be empty.
     pub fn save(&self, path: &Path) {
@@ -142,23 +143,29 @@ struct FileInstance {
 }
 impl FileInstance {
     /// Save information on a new file containing a document snapshot of a person's writing.
-    fn build(path: String) -> FileInstance {
-        FileInstance {
+    fn build(path: String) -> Result<FileInstance> {
+        Ok(FileInstance {
             path: path.clone(),
             time: Path::new(&path)
                 .components()
                 .nth_back(1)
-                .expect("Couldn't find folder name")
+                .with_context(|| {
+                    format!(
+                        "Couldn't find folder name of specified file path: {}.\nPlease ensure all documents in this directory are Microsoft Word files (docx)",
+                        path.to_string_lossy()
+                    )
+                })?
                 .as_os_str()
                 .to_string_lossy()
                 .to_string(),
             filesize: fs::metadata(&path).unwrap().len(),
-            text: DocxParser::open(path)
-                .expect("Couldn't open document in the Microsoft Word parser")
-                .parse()
-                .expect("Could not parse Microsoft Word document")
+            text: DocxParser::open(&path)
+                .with_context(|| {
+                    format!("Could not open file at path: {}.\nPlease ensure all documents in this directory are Microsoft Word files (.docx)", path.to_string_lossy())
+                })?
+                .parse().with_context(||format!("Could not parse file found at {}.\nPlease ensure all documents in this directory are uncorrupted Microsoft Word files (docx)", path.to_string_lossy()))?
                 .plain_text(),
-        }
+        })
     }
     /// Get the raw text contained in the file.
     fn get_text(&self) -> &String {
@@ -254,16 +261,22 @@ pub struct PersonHistory {
 }
 impl PersonHistory {
     /// Creates a NewPerson struct, calculating differences between writing snapshots and storing a bunch of data on the writing of that person. Requires the filename of the person's documents and a vector containing paths to every document the person wrote.
-    pub fn build(filename: String, paths: Vec<String>) -> PersonHistory {
+    pub fn build(filename: String, paths: Vec<String>) -> Result<PersonHistory> {
         let mut content: Vec<FileInstance> = paths
             .iter()
             .map(|path| FileInstance::build(path.to_string()))
-            .collect::<Vec<FileInstance>>();
+            .collect::<Result<Vec<FileInstance>>>()
+            .with_context(|| {
+                format!(
+                    "Failed to extract data for person using files named {}",
+                    filename
+                )
+            })?;
         content.sort_by_key(|file| file.get_time_period().to_owned());
-        PersonHistory {
+        Ok(PersonHistory {
             filename,
             data: TimePeriod::build_from_history(content),
-        }
+        })
     }
     /// Prints a specific kind of data for the entire history of a person's writing, as determined by the SaveType input. For instance, this function can print all word-level additions, of the fulltext of each snapshot.
     pub fn print_history(&self, edit_type: &SaveType) {
