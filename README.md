@@ -61,7 +61,7 @@ Begin by installing [Rust](https://rust-lang.org/tools/install/) through [rustup
 Consider the following example to understand the current behavior of the parsing algorithm (which is subject to change).
 **Original Text at Time 1:**
 
-```
+> ```
 This is the original text. This sentence will be deleted. A sentence about birds will be added after this sentence. The word deer will be deleted. This sentence will have the name of an amphibian added. The word tree will be pluralized. The word wolves and the word eels will be converted to the singular form. The word frogs will be changed to the name for a type of water vapor.
 This is a new paragraph. A sentence about fish will be added to the beginning of this paragraph.
 ```
@@ -82,15 +82,21 @@ Birds are cool! The word will be deleted. This sentence will have the name of an
 
 **SentenceEdits:**
 
-```This sentence will be deleted. The word deer will be deleted. This sentence will have the name of an amphibian added. The word tree will be pluralized. The word wolves and the word eels will be converted to the singular form. The word frogs will be changed to the name for a type of water vapor. Birds are cool! The word will be deleted. This sentence will have the name of an amphibian salamander added. The word trees will be pluralized. The word wolf and the word eel will be converted to the singular form. The word fog will be changed to the name for a type of water vapor. Fish are a diverse group of species.```
+```
+This sentence will be deleted. The word deer will be deleted. This sentence will have the name of an amphibian added. The word tree will be pluralized. The word wolves and the word eels will be converted to the singular form. The word frogs will be changed to the name for a type of water vapor. Birds are cool! The word will be deleted. This sentence will have the name of an amphibian salamander added. The word trees will be pluralized. The word wolf and the word eel will be converted to the singular form. The word fog will be changed to the name for a type of water vapor. Fish are a diverse group of species.
+```
 
 **WordAdditions:**
 
-```Birds are cool salamander trees wolf eel fog Fish are a diverse group of species```
+```
+Birds are cool salamander trees wolf eel fog Fish are a diverse group of species
+```
 
 **WordDeletions:**
 
-```This sentence will be deleted deer tree wolves eels frogs```
+```
+This sentence will be deleted deer tree wolves eels frogs
+```
 
 Notice that the sentence-level changes capture the entire sentence, even if the edit is limited to one or a few words. These two outputs are useful when trying to capture the context around edits or when running text analysis algorithms that rely on complete sentences or correct grammar. Please also notice that word deletions occur whenever a word is changed. I am considering changing this behavior in the future — please leave an issue or a pull request if you would like deletion data to be less lenient.
 ## Contributing
