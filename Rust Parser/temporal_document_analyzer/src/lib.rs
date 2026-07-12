@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use csv;
 use ignore::{DirEntry, WalkBuilder};
 use indicatif::{ParallelProgressIterator, ProgressIterator};
-use itertools::{izip, MultiUnzip};
+use itertools::{izip, Itertools};
 use rayon::prelude::*;
 use serde::Serialize;
 use similar::DiffableStr;
@@ -57,6 +57,7 @@ impl DatabaseHistory {
                     .to_string_lossy()
                     .into_owned()
             })
+            .sorted()
             .collect();
         // Pass info on all files and folders to this function to get actual data on people's writing.
         let data = Self::extract_data(file_structure)?;
