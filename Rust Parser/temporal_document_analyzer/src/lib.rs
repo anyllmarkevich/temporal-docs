@@ -135,8 +135,8 @@ impl DatabaseHistory {
                 // Both output a file containing summary statistics for a person and save the generated filepath for that person to memory.
                 let person_path = person.write(&person_data_path).with_context(|| {
                     format!(
-                        "Failed to save data about the person using the filename {}",
-                        person.get_name()
+                        "Failed to save data about the person using the filename {} in the \"PeopleInfo.csv\" file at the following path: {}",
+                        person.get_name(), path.to_string_lossy()
                     )
                 })?;
                 // Save a CSV containing paths to people's data.
@@ -160,13 +160,47 @@ impl DatabaseHistory {
                     })?;
                 Ok::<(), anyhow::Error>(())
             });
-        people_data_paths_wtr.flush().unwrap();
+        people_data_paths_wtr.flush().with_context(|| {
+            format!(
+                "Failed to flush \"Peopleinfo.csv\" at the folling path: {}",
+                path.to_string_lossy()
+            )
+        })?;
         let mut savetype_wtr =
-            csv::Writer::from_path(path.join("SaveType.csv")).expect("Could not open saving path.");
-        SaveType::list_savetypes()
-            .iter()
-            .for_each(|x| savetype_wtr.write_record(&[x]).expect("Writing issue."));
-        savetype_wtr.flush().unwrap();
+            csv::Writer::from_path(path.join("SaveType.csv")).with_context(|| {
+                format!(
+                    "Could not create \"SaveType.csv\" file at the following path: {}",
+                    path.to_string_lossy()
+                )
+            })?;
+        let _ = SaveType::list_savetypes().iter().try_for_each(|x| {
+            savetype_wtr.write_record(&[x]).with_context(|| format!("Failed to save information on the save type {} in the \"SaveType.csv\" file at the following path: {}", x, path.to_string_lossy()))?;
+            Ok::<(), anyhow::Error>(())
+        });
+        savetype_wtr.flush().with_context(|| {
+            format!(
+                "Failed to flush \"SaveType.csv\" at the folling path: {}",
+                path.to_string_lossy()
+            )
+        })?;
+        let mut all_time_periods_wtr = csv::Writer::from_path(path.join("TimePeriods.csv"))
+            .with_context(|| {
+                format!(
+                    "Could not create \"TimePeriods.csv\" file at the following path: {}",
+                    path.to_string_lossy()
+                )
+            })?;
+        let _ = self.time_periods.iter().try_for_each(|x| {
+            all_time_periods_wtr.write_record(&[x]).with_context(|| format!("Failed to save information on the time period {} in the \"TimePeriods.csv\" file at the following path: {}", x, path.to_string_lossy()))?;
+            Ok::<(), anyhow::Error>(())
+        });
+        all_time_periods_wtr.flush().with_context(|| {
+            format!(
+                "Failed to flush \"TimePeriods.csv\" at the folling path: {}",
+                path.to_string_lossy()
+            )
+        })?;
+
         Ok(())
     }
     /// Return a vector of the names of all the time periods this data structure contains.
