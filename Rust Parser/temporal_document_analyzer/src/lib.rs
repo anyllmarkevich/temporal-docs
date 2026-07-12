@@ -3,6 +3,7 @@ pub mod text_edits;
 use anyhow::{Context, Result};
 use core::panic;
 use csv;
+use ignore::{DirEntry, WalkBuilder};
 use indicatif::{ParallelProgressIterator, ProgressIterator};
 use itertools::{izip, MultiUnzip};
 use rayon::prelude::*;
@@ -17,7 +18,7 @@ use std::{
 use text_edits::*;
 use undoc::docx::DocxParser;
 use unicode_segmentation::UnicodeSegmentation;
-use walkdir::{DirEntry, WalkDir};
+//use walkdir::{DirEntry, WalkDir};
 
 /// Captures and saves a complete record of the every document written by every person in the database, along with a complete record of changes between time periods.
 /// # Example Usage
@@ -39,10 +40,10 @@ impl DatabaseHistory {
     pub fn build(path: &Path) -> Result<DatabaseHistory> {
         println!("Locating time period directories...");
         // Get data on files and folders on the input dataset.
-        let file_structure: Vec<DirEntry> = WalkDir::new(path)
-            .min_depth(1)
-            .max_depth(2)
-            .into_iter()
+        let file_structure: Vec<DirEntry> = WalkBuilder::new(path)
+            .min_depth(Some(1))
+            .max_depth(Some(2))
+            .build()
             .filter_map(|e| e.ok())
             .collect();
         let file_structure = error::check_file_tree(file_structure)?; // Ensure that the file tree is roughly formatted correctly.
@@ -50,7 +51,7 @@ impl DatabaseHistory {
         // Get the names of all time periods.
         let time_periods: Vec<String> = file_structure
             .iter()
-            .filter(|e| e.depth() == 1 && e.file_type().is_dir())
+            .filter(|e| e.depth() == 1 && e.file_type().map_or(false, |f| f.is_dir()))
             .map(|dir| {
                 dir.path()
                     .file_name()
@@ -72,7 +73,7 @@ impl DatabaseHistory {
         println!("Locating files...");
         let people_hash: HashMap<String, Vec<String>> = files
             .into_par_iter()
-            .filter(|e| e.depth() == 2 && e.file_type().is_file())
+            .filter(|e| e.depth() == 2 && e.file_type().map_or(false, |f| f.is_file()))
             .map(|file| {
                 let name = file
                     .path()
