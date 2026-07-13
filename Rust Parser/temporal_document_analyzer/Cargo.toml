@@ -7,7 +7,8 @@ description = "Convert temporal snapshopts of docx files from multiple people in
 license = "MIT"
 homepage = "https://github.com/anyllmarkevich/temporal-docs"
 repository = "https://github.com/anyllmarkevich/temporal-docs"
-keywords = ["versioning", "docx", "document history", "document versioning", "data extraction"]
+keywords = ["versioning", "docx", "document_history", "document_versioning", "data_extraction"]
+categories = ["command_line_utilities", "parsing", "text_processing"]
 
 [dependencies]
 anyhow = "1.0.103"
