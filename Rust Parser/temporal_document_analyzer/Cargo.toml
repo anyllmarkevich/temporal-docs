@@ -2,6 +2,12 @@
 name = "temporal_docx"
 version = "0.1.0"
 edition = "2024"
+authors = ["Anyll Markevich <anyllmarkevich@gmail.com>"]
+description = "Convert temporal snapshopts of docx files from multiple people into analysis-ready text."
+license = "MIT"
+homepage = "https://github.com/anyllmarkevich/temporal-docs"
+repository = "https://github.com/anyllmarkevich/temporal-docs"
+keywords = ["cli", "Microsoft Word", "versioning", "versions", "docx", "doc", "document", "document history", "document versioning", "R", "data scraping", "data extraction"]
 
 [dependencies]
 anyhow = "1.0.103"
